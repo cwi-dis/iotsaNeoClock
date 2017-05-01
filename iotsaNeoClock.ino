@@ -377,7 +377,7 @@ void neoClockAlert() {
       }
       message += "<li><a href='/alert?alert=" + alertName + "'>" + alertUserName + "</a></li>";
   }
-  message += "</ul><p>To show status access /alert?timeout=seconds&status=0xrrggbb/0xrrggbb, to show temporal status access /alert?temporalStatus=0xrrggbb/0xrrggbb/...</p></body></html>";
+  message += "</ul><p>To show status access /alert?timeout=seconds&status=0xrrggbb/0xrrggbb, to show temporal status access /alert?temporalStatus=0xrrggbb/1.0/0.5/...</p></body></html>";
   server.send(200, "text/html", message);
 }
 

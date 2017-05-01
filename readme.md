@@ -1,4 +1,4 @@
-# iotsaNeoClock - web server to drive an LCD display
+# iotsaNeoClock - an internet-connected clock
 
 A clock comprised of 60 NeoPixel LEDs. Shows the time, but can also show programmable patterns (as alerts) and temporal information (such as expected rainfall for the coming hour). Schematics and building instructions included.
 
@@ -41,9 +41,13 @@ If you want different colors for the hands your can adapt the `COLOR_SEC`, `COLO
 
 The first time the board boots it creates a Wifi network with a name similar to _config-iotsa1234_.  Connect a device to that network and visit <http://192.168.4.1>. Configure your device name (using the name _neoclock_ is suggested), WiFi name and password, and after reboot the iotsa board should connect to your network and be visible as <http://neoclock.local>.
 
+### Configuration
+
 Visit <http://neoclock.local/ntpconfig> to configure the NTP (Network Time Protocol) server to use (but the default _pool.ntp.org_ will usually work) and your timezone. After about half a minute the clock should have a fix and start displaying the right time. The time is also shown on the ntpconfig page and on the clock homepage.
 
 You can change the brightness of the clock at <http://neoclock.local/brightness>. You can either set a single brightness value, or set _Adapt to ambient light_ and set a minimum and maximum brightness.
+
+### Alerts
 
 The clock can display alerts, which are sequences of patterns, there are sample patterns in [data](data).
 Each line consists of 181 numbers: a duration (in milliseconds) and 60 R, G and B values for each of the pixels. Triggering an alert will simply show the lines in order.
@@ -52,6 +56,32 @@ Alerts are uploaded via <http://neoclock.local/upload> and then triggered by acc
 
 Alerts are intended to be shown programmatically when something interesting has happened, such as a doorbell being pushed, or a facebook mention, or whatever you can think of. [Igor](https://github.com/cwi-dis/iotsa) is a good way of connecting triggers to alerts.
 
-The clock can also display _status information_, which is intended to be longer-lived. Think of things like "the garden door is open" or "the temperature in the freezer is above -20 C". 
+### Status indicators
 
-_more to come_.
+The clock can also display _status information_, which is intended to be longer-lived. Think of things like "the garden door is open" or "the temperature in the freezer is above -20 C". There are two types of status indicators:
+
+* the inner ring is used for _main status information_. All 12 LEDs show the same color and intensity.
+* the outer ring is used for _temporal status information_, information for the coming hour. The LEDs all have the same color, but the intensity can vary. This can be used to get a quick visual indication of things like the expected rainfall in the coming hour.
+
+Some example URLs to trigger status indicators:
+
+```
+http://neoclock.local/alert?status=0x00ff00
+```
+
+Sets the inner ring to bright green.
+
+```
+http://neoclock.local/alert?timeout=60&status=0x006600
+```
+Sets the inner ring to medium green for 60 seconds, then revert to normal.
+
+```
+http://neoclock.local/alert?timeout=300&status=/0xff0000
+```
+Sets the inner ring to normal (unlit) for 5 minutes, then go to a very bright red. This can be used as a watchdog: by re-issuing this command within those 5 minutes the red will never show up. Unless the agent that is responsible for contacting the URL is too late.
+
+```
+http://neoclock.local/alert?timeout=300&temporalStatus=0xccffff/1.0/0.0/0.0/0.5
+```
+Sets the outer ring with timed information. Where the minute had is pointing is set to 100% lightish blue, 15 minutes into the future to that color with 50% intensity. After 5 minutes the outer ring will revert to normal.

@@ -3,6 +3,7 @@
 A clock comprised of 60 NeoPixel LEDs. Shows the time, but can also show programmable patterns (as alerts) and temporal information (such as expected rainfall for the coming hour). Schematics and building instructions included.
 
 Home page is <https://github.com/cwi-dis/iotsaNeoClock>.
+This software is licensed under the [MIT license](LICENSE.txt) by the   CWI DIS group, <http://www.dis.cwi.nl>.
 
 ## Software requirements
 

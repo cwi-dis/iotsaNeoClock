@@ -375,7 +375,7 @@ void neoClockAlert() {
       if (alertUserName.endsWith(".bin")) {
         alertUserName.remove(alertUserName.length()-4);
       }
-      message += "<li><a href='/alert?alert=" + alertName + "'>" + alertUserName + "</a></li>";
+      message += "<li><a href='/alert?alert=" + IotsaMod::htmlEncode(alertName) + "'>" + IotsaMod::htmlEncode(alertUserName) + "</a></li>";
   }
   message += "</ul><p>To show status access /alert?timeout=seconds&status=0xrrggbb/0xrrggbb, to show temporal status access /alert?temporalStatus=0xrrggbb/1.0/0.5/...</p></body></html>";
   server.send(200, "text/html", message);

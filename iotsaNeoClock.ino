@@ -238,6 +238,15 @@ uint32_t currentStatusColor;
 uint32_t currentStatusColorEndTime;
 uint32_t nextStatusColor;
 
+static uint32_t _getStatusColor() {
+  if (tempConfigurationMode == TMPC_RESET) return 0x3f0000; // Red: Factory reset mode
+  if (tempConfigurationMode == TMPC_CONFIG) return 0x3f003f;  // Pink: user-requested configuration mode
+  if (tempConfigurationMode == TMPC_OTA) return 0x003f3f; // Magenta: OTA mode
+  if (configurationMode) return 0x3f3f00; // Yellow: configuration mode (not user requested)
+  if (!WiFi.isConnected()) return 0x3f1f00; // Orange: not connected to WiFi
+  return 0; // Off: all ok.
+}
+
 bool neoClockShowStatus() {
   if (currentStatusColorEndTime && millis() > currentStatusColorEndTime) {
     // Clear the status indicator whenever it times out
@@ -245,11 +254,8 @@ bool neoClockShowStatus() {
     currentStatusColor = nextStatusColor;
   }
   uint32_t color = 0;
-  if (tempConfigurationMode == TMPC_CONFIG) {
-    color = 0x080800;
-  } else if (tempConfigurationMode == TMPC_OTA) {
-    color = 0x000808;   
-  } else {
+  color = _getStatusColor();
+  if (color == 0) {
     color = currentStatusColor;
   }
   if (color == 0) return false;
@@ -259,6 +265,16 @@ bool neoClockShowStatus() {
   }
   return true;
 }
+
+class NeoClockIotsaStatus : public IotsaStatusInterface {
+  void showStatus() {
+    strip.clear();
+    neoClockShowStatus();
+    strip.show();
+  }
+};
+
+NeoClockIotsaStatus iotsaStatus;
 
 uint32_t temporalStatusColor[12];
 uint32_t temporalStatusColorEndTime;
@@ -388,10 +404,11 @@ void neoClockLoop() {
 IotsaSimpleMod neoMod(application, "/alert", neoClockAlert, neoClockInfo);
 
 void setup(void){
+  neoClockSetup();
+  application.status = &iotsaStatus;
   application.setup();
   application.serverSetup();
   ESP.wdtEnable(WDTO_120MS);
-  neoClockSetup();
 }
  
 void loop(void){

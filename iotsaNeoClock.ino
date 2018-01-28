@@ -68,9 +68,9 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, NEOPIXEL_PIN, NEO_GRB + NE
 // Helper function - combine r/g/b values into rgb with clamping and checking
 //
 static uint32_t combineRGB(uint32_t oldRGB, float factor, int red, int green, int blue) {
-  red = (int)(red*factor);
-  green = (int)(green*factor);
-  blue = (int)(blue*factor);
+  red = (int)(red*factor) + int(red > 0);
+  green = (int)(green*factor) + int(green > 0);
+  blue = (int)(blue*factor) + int(blue > 0);
   red += (oldRGB >> 16) & 0xff;
   green += (oldRGB >> 8) & 0xff;
   blue += oldRGB & 0xff;

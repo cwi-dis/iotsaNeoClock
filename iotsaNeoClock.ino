@@ -48,6 +48,7 @@ IotsaFilesBackupMod filesBackupMod(application);  // we want backup to clone the
 #define NUM_MIN_LEDS      5
 #define STRIDE_MIN_LEDS   5
 
+#undef FIRST_LED_AT_ONE_O_CLOCK // Define for first two clocks, which had first led at 1 o'clock position
 #define WITH_BRIGHTNESS   // Define to allow changing of the clock brightness through the web interface
 
 #ifdef WITH_BRIGHTNESS
@@ -139,7 +140,12 @@ void neoClockShowMinutes(int minutes, float frac) {
 
 void neoClockShowHours(int hours, float frac) {
   IFDEBUGX { IotsaSerial.print("hours="); IotsaSerial.println(hours); }
-  int firstLed = FIRST_HOUR_LED + ((hours+11)*STRIDE_HOUR_LEDS);
+  int firstLed = FIRST_HOUR_LED;
+#ifdef FIRST_LED_AT_ONE_O_CLOCK
+  firstLed += (hours+11)*STRIDE_HOUR_LEDS;
+#else
+  firstLed += hours*STRIDE_HOUR_LEDS;
+#endif
   int extraLed = 0;
   // Determine which segment to show the hour hand (depending on whether where
   // at <30 minutes past the hour or >30 minutes past) and

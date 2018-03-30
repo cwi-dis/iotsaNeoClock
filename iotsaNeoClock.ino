@@ -244,6 +244,9 @@ uint32_t currentStatusColor;
 uint32_t currentStatusColorEndTime;
 uint32_t nextStatusColor;
 
+#ifdef WITH_IOTSA_CONFIG_STRUCT
+#define _getStatusColor() iotsaConfig.getStatusColor()
+#else
 static uint32_t _getStatusColor() {
   if (tempConfigurationMode == TMPC_RESET) return 0x3f0000; // Red: Factory reset mode
   if (tempConfigurationMode == TMPC_CONFIG) return 0x3f003f;  // Pink: user-requested configuration mode
@@ -252,6 +255,7 @@ static uint32_t _getStatusColor() {
   if (!WiFi.isConnected()) return 0x3f1f00; // Orange: not connected to WiFi
   return 0; // Off: all ok.
 }
+#endif
 
 bool neoClockShowStatus() {
   if (currentStatusColorEndTime && millis() > currentStatusColorEndTime) {

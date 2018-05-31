@@ -4,9 +4,9 @@
 void
 IotsaBrightnessMod::handler() {
   bool anyChanged = false;
-  for (uint8_t i=0; i<server.args(); i++) {
-    if (server.argName(i) == "brightness") {
-      int b = server.arg(i).toInt();
+  for (uint8_t i=0; i<server->args(); i++) {
+    if (server->argName(i) == "brightness") {
+      int b = server->arg(i).toInt();
       if (b > 0 && b/100.0 != maxBrightnessFactor) {
         maxBrightnessFactor = b/100.0;
         curBrightnessFactor = maxBrightnessFactor;
@@ -14,8 +14,8 @@ IotsaBrightnessMod::handler() {
       }
     }
 #ifdef WITH_ADAPTATION
-    if (server.argName(i) == "auto") {
-      String a = server.arg(i);
+    if (server->argName(i) == "auto") {
+      String a = server->arg(i);
       bool na = false;
       if (a == "yes" || a == "true" || a.toInt() > 0) na = true;
       if (na != autoBrightness) {
@@ -23,8 +23,8 @@ IotsaBrightnessMod::handler() {
       	anyChanged = true;
       }
     }
-    if (server.argName(i) == "minBrightness") {
-      int b = server.arg(i).toInt();
+    if (server->argName(i) == "minBrightness") {
+      int b = server->arg(i).toInt();
       if (b > 0 && b/100.0 != minBrightnessFactor) {
         minBrightnessFactor = b/100.0;
         anyChanged = true;
@@ -54,7 +54,7 @@ IotsaBrightnessMod::handler() {
   message += "%<br>";
 #endif
   message += "<input type='submit'></form></body></html>";
-  server.send(200, "text/html", message);
+  server->send(200, "text/html", message);
 }
 
 void IotsaBrightnessMod::setup() {
@@ -63,7 +63,7 @@ void IotsaBrightnessMod::setup() {
 }
 
 void IotsaBrightnessMod::serverSetup() {
-  server.on("/brightness", std::bind(&IotsaBrightnessMod::handler, this));
+  server->on("/brightness", std::bind(&IotsaBrightnessMod::handler, this));
 }
 
 void IotsaBrightnessMod::configLoad() {

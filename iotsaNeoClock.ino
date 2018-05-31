@@ -22,8 +22,7 @@
 
 #define IFDEBUGX if(0)
 
-ESP8266WebServer server(80);
-IotsaApplication application(server, "NeoPixel Clock Server");
+IotsaApplication application("NeoPixel Clock Server");
 
 // Configure modules we need
 IotsaWifiMod wifiMod(application);  // wifi is always needed
@@ -87,7 +86,7 @@ static uint32_t combineRGB(uint32_t oldRGB, float factor, int red, int green, in
 //
 // Helper function - blend color into pixel
 //
-static uint32_t blendPixel(int idx, float factor, uint32_t rgb) {
+static void blendPixel(int idx, float factor, uint32_t rgb) {
   int red = (rgb >> 16) & 0xff;
   int green = (rgb >> 8) & 0xff;
   int blue = rgb & 0xff;
@@ -104,7 +103,7 @@ void neoClockShowSeconds(int seconds, float frac) {
   float valBefore = frac < 0.3 ? (0.3-frac) : 0;
   float valAfter = frac > 0.7 ?  (frac-0.7) : 0;
   float valSelf = 1.0-(valBefore+valAfter);
-  IFDEBUGX { IotsaSerial.printf("seconds=%d, before=%d, self=%d, after=%d", seconds, valBefore, valSelf, valAfter); IotsaSerial.println(); }
+  IFDEBUGX { IotsaSerial.printf("seconds=%d, before=%f, self=%f, after=%f", seconds, valBefore, valSelf, valAfter); IotsaSerial.println(); }
 
   int ledSelf = FIRST_SEC_LED+seconds;
   int ledBefore = ledSelf + NUM_LEDS-1;
@@ -244,19 +243,6 @@ uint32_t currentStatusColor;
 uint32_t currentStatusColorEndTime;
 uint32_t nextStatusColor;
 
-#ifdef WITH_IOTSA_CONFIG_STRUCT
-#define _getStatusColor() iotsaConfig.getStatusColor()
-#else
-static uint32_t _getStatusColor() {
-  if (tempConfigurationMode == TMPC_RESET) return 0x3f0000; // Red: Factory reset mode
-  if (tempConfigurationMode == TMPC_CONFIG) return 0x3f003f;  // Pink: user-requested configuration mode
-  if (tempConfigurationMode == TMPC_OTA) return 0x003f3f; // Magenta: OTA mode
-  if (configurationMode) return 0x3f3f00; // Yellow: configuration mode (not user requested)
-  if (!WiFi.isConnected()) return 0x3f1f00; // Orange: not connected to WiFi
-  return 0; // Off: all ok.
-}
-#endif
-
 bool neoClockShowStatus() {
   if (currentStatusColorEndTime && millis() > currentStatusColorEndTime) {
     // Clear the status indicator whenever it times out
@@ -264,7 +250,7 @@ bool neoClockShowStatus() {
     currentStatusColor = nextStatusColor;
   }
   uint32_t color = 0;
-  color = _getStatusColor();
+  color = iotsaConfig.getStatusColor();
   if (color == 0) {
     color = currentStatusColor;
   }
@@ -338,23 +324,23 @@ bool neoClockStartAlert(String &name) {
 
 void neoClockAlert() {
   uint32_t endTime = 0;
-  for (uint8_t i=0; i<server.args(); i++) {
-    if (server.argName(i) == "timeout") {
-      String toutstr = server.arg(i);
+  for (uint8_t i=0; i<application.server->args(); i++) {
+    if (application.server->argName(i) == "timeout") {
+      String toutstr = application.server->arg(i);
       endTime = strtoul(toutstr.c_str(), 0, 0);
       endTime = endTime*1000 + millis();
     }
-    if( server.argName(i) == "alert") {
-      String alertName = server.arg(i);
+    if( application.server->argName(i) == "alert") {
+      String alertName = application.server->arg(i);
       if (neoClockStartAlert(alertName)) {
-        server.send(200, "text/plain", "OK");
+        application.server->send(200, "text/plain", "OK");
       } else {
-        server.send(404, "text/plain", "Unknown alert " + alertName);
+        application.server->send(404, "text/plain", "Unknown alert " + alertName);
       }
       return;
     }
-    if (server.argName(i) == "status") {
-      String color = server.arg(i);
+    if (application.server->argName(i) == "status") {
+      String color = application.server->arg(i);
       char *nextColor = NULL;
       currentStatusColor = strtoul(color.c_str(), &nextColor, 0);
       if (*nextColor == '/') {
@@ -365,11 +351,11 @@ void neoClockAlert() {
         nextStatusColor = 0;
       }
       currentStatusColorEndTime = endTime; // Note: timeout argument must come before status argument
-      server.send(200, "text/plain", "OK");
+      application.server->send(200, "text/plain", "OK");
       return;
     }
-    if (server.argName(i) == "temporalStatus") {
-      String argStr = server.arg(i);
+    if (application.server->argName(i) == "temporalStatus") {
+      String argStr = application.server->arg(i);
       char *argCStr = (char *)argStr.c_str();
       // Read base color value
       uint32_t color = strtoul(argCStr, &argCStr, 0);
@@ -389,7 +375,7 @@ void neoClockAlert() {
         temporalStatusColor[(idx+startIdx)%12] = combineRGB(0, thisFactor, red, green, blue);
       }
       temporalStatusColorEndTime = endTime;
-      server.send(200, "text/plain", "OK");
+      application.server->send(200, "text/plain", "OK");
       return;
     }
   }
@@ -404,7 +390,7 @@ void neoClockAlert() {
       message += "<li><a href='/alert?alert=" + IotsaMod::htmlEncode(alertName) + "'>" + IotsaMod::htmlEncode(alertUserName) + "</a></li>";
   }
   message += "</ul><p>To show status access /alert?timeout=seconds&status=0xrrggbb/0xrrggbb, to show temporal status access /alert?temporalStatus=0xrrggbb/1.0/0.5/...</p></body></html>";
-  server.send(200, "text/html", message);
+  application.server->send(200, "text/html", message);
 }
 
 void neoClockLoop() {

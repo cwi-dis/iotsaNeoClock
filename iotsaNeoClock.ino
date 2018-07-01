@@ -47,7 +47,7 @@ IotsaFilesBackupMod filesBackupMod(application);  // we want backup to clone the
 #define NUM_MIN_LEDS      5
 #define STRIDE_MIN_LEDS   5
 
-#undef FIRST_LED_AT_ONE_O_CLOCK // Define for first two clocks, which had first led at 1 o'clock position
+#define FIRST_LED_AT_ONE_O_CLOCK // Define for first two clocks, which had first led at 1 o'clock position
 #define WITH_BRIGHTNESS   // Define to allow changing of the clock brightness through the web interface
 
 #ifdef WITH_BRIGHTNESS
@@ -183,7 +183,7 @@ unsigned long lastTimeShown;
 
 File currentAlert;
 bool currentAlertIsBinary;
-long currentAlertLineEndTime;
+unsigned long currentAlertLineEndTime;
 
 uint32_t read32bin(Stream& s) {
   int b1 = s.read();
@@ -282,7 +282,7 @@ bool neoClockShowTemporalStatus() {
     for (int i=0; i<12; i++) temporalStatusColor[i] = 0;
   }
   // Set the outer ring to the per-5-minutes status color
-  int idx;
+  int idx = 0;
   for(int i=0; i<NUM_LEDS; i+=STRIDE_HOUR_LEDS) {
     blendPixel(i, 1.0, temporalStatusColor[idx++]);
   }
@@ -362,7 +362,6 @@ void neoClockAlert() {
       int red = (color >> 16) & 0xff;
       int green = (color >> 8) & 0xff;
       int blue = color & 0xff;
-      int idx = 0;  // For 0 to 11, number of values we re expecting (maximum)
       int startIdx = ntpMod.localMinutes() / 5; // Where value[0] will be displayed
       for (int idx = 0; idx < 12; idx++) {
         float thisFactor = 1.0; // What we should multiply the color with, for this LED        

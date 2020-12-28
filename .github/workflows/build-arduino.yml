@@ -23,7 +23,7 @@ jobs:
     - name: Install iotsa libraries
       uses: actions/checkout@v2
       with:
-          repository: dis-git/iotsa
+          repository: cwi-dis/iotsa
           path: CustomLibrary_iotsa
           ref: develop
       

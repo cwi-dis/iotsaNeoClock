@@ -7,7 +7,7 @@ on:
     paths-ignore:
     - '.github/workflows/build-arduino.yml'
     - 'docs/**'
-  repository-dispatch:
+  repository_dispatch:
     types: [rebuild]
   
 env:

@@ -7,9 +7,13 @@ on:
     paths-ignore:
     - '.github/workflows/build-arduino.yml'
     - 'docs/**'
+  repository-dispatch:
+    types: [rebuild]
+  
 env:
   iotsa_ref: develop
   this_product: iotsaNeoClock
+  
 jobs:
   build:
     runs-on: ubuntu-latest

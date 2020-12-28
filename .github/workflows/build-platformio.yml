@@ -67,5 +67,5 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v2
       with:
-        name: ${{ env.this_product }}-${{ matrix.board }}.bin
+        name: ${{ env.this_product }}-${{ matrix.board }}-${{ env.iotsa_ref }}.bin
         path: .pio/build/${{ matrix.board }}/firmware.bin

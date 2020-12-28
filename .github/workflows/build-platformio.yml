@@ -58,7 +58,7 @@ jobs:
         pio lib -g install "CoAP simple library@1.3.19"
         pio lib -g install "esp32_https_server_compat@~1.0.0"
         pio lib -g install "DHT sensor library@~1.4.1"
-        pio lib -g install "https://github.com/cwi-dis/iotsa.git#${{ env.iotsa_ref }}""
+        pio lib -g install "https://github.com/cwi-dis/iotsa.git#${{ env.iotsa_ref }}"
 
     - name: Run PlatformIO
       run: |

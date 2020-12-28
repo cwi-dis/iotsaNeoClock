@@ -7,6 +7,9 @@ on:
     paths-ignore:
     - '.github/workflows/build-arduino.yml'
     - 'docs/**'
+env:
+  iotsa: https://github.com/cwi-dis/iotsa.git#develop
+  
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -55,7 +58,7 @@ jobs:
         pio lib -g install "CoAP simple library@1.3.19"
         pio lib -g install "esp32_https_server_compat@~1.0.0"
         pio lib -g install "DHT sensor library@~1.4.1"
-        pio lib -g install "https://github.com/cwi-dis/iotsa.git#develop"
+        pio lib -g install ${{ env.iotsa }}
 
     - name: Run PlatformIO
       run: |

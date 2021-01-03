@@ -24,14 +24,14 @@ public:
 #endif
   {}
   
-  void setup();
-  void serverSetup();
-  void loop();
-  String info();
+  void setup() override;
+  void serverSetup() override;
+  void loop() override;
+  String info() override;
   float brightness();
 protected:
-  void configLoad();
-  void configSave();
+  void configLoad() override;
+  void configSave() override;
   void handler();
   float curBrightnessFactor;
   float maxBrightnessFactor;

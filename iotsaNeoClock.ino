@@ -263,7 +263,7 @@ bool neoClockShowStatus() {
 }
 
 class NeoClockIotsaStatus : public IotsaStatusInterface {
-  void showStatus() {
+  void showStatus() override {
     strip.clear();
     neoClockShowStatus();
     strip.show();

@@ -11,6 +11,9 @@
 
 #include <Esp.h>
 #include <FS.h>
+#ifdef ESP32
+#include <SPIFFS.h>
+#endif
 #include "iotsa.h"
 #include "iotsaWifi.h"
 #include "iotsaNtp.h"
@@ -379,6 +382,19 @@ void neoClockAlert() {
     }
   }
   String message = "<html><head><title>Available Alerts</title></head><body><h1>Available Alerts</h1><ul>";
+#ifdef ESP32
+  File d = SPIFFS.open("/data");
+  File f = d.openNextFile();
+  while (f) {
+      String alertName = f.name();
+      alertName = alertName.substring(6);
+      String alertUserName = alertName;
+      if (alertUserName.endsWith(".bin")) {
+        alertUserName.remove(alertUserName.length()-4);
+      }
+      message += "<li><a href='/alert?alert=" + IotsaMod::htmlEncode(alertName) + "'>" + IotsaMod::htmlEncode(alertUserName) + "</a></li>";
+  }
+#else
   Dir d = SPIFFS.openDir("/data");
   while (d.next()) {
       String alertName = d.fileName().substring(6);
@@ -388,6 +404,7 @@ void neoClockAlert() {
       }
       message += "<li><a href='/alert?alert=" + IotsaMod::htmlEncode(alertName) + "'>" + IotsaMod::htmlEncode(alertUserName) + "</a></li>";
   }
+#endif
   message += "</ul><p>To show status access /alert?timeout=seconds&status=0xrrggbb/0xrrggbb, to show temporal status access /alert?temporalStatus=0xrrggbb/1.0/0.5/...</p></body></html>";
   application.server->send(200, "text/html", message);
 }
@@ -403,7 +420,9 @@ void setup(void){
   application.status = &iotsaStatus;
   application.setup();
   application.serverSetup();
+#ifndef ESP32
   ESP.wdtEnable(WDTO_120MS);
+#endif
 }
  
 void loop(void){

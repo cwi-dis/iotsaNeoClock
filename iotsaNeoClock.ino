@@ -11,10 +11,8 @@
 
 #include <Esp.h>
 #include <FS.h>
-#ifdef ESP32
-#include <SPIFFS.h>
-#endif
 #include "iotsa.h"
+#include "iotsaFS.h"
 #include "iotsaWifi.h"
 #include "iotsaNtp.h"
 #include "iotsaOta.h"
@@ -319,7 +317,7 @@ bool neoClockStartAlert(String &name) {
     currentAlert.close();
   }
   String fileName = "/data/" + name;
-  currentAlert = SPIFFS.open(fileName, "r");
+  currentAlert = IOTSA_FS.open(fileName, "r");
   if (!currentAlert) return false;
   currentAlertIsBinary = fileName.endsWith(".bin");
   return true;
@@ -383,7 +381,7 @@ void neoClockAlert() {
   }
   String message = "<html><head><title>Available Alerts</title></head><body><h1>Available Alerts</h1><ul>";
 #ifdef ESP32
-  File d = SPIFFS.open("/data");
+  File d = IOTSA_FS.open("/data");
   File f = d.openNextFile();
   while (f) {
       String alertName = f.name();
@@ -395,7 +393,7 @@ void neoClockAlert() {
       message += "<li><a href='/alert?alert=" + IotsaMod::htmlEncode(alertName) + "'>" + IotsaMod::htmlEncode(alertUserName) + "</a></li>";
   }
 #else
-  Dir d = SPIFFS.openDir("/data");
+  Dir d = IOTSA_FS.openDir("/data");
   while (d.next()) {
       String alertName = d.fileName().substring(6);
       String alertUserName = alertName;

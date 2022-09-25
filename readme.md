@@ -1,5 +1,8 @@
 # iotsaNeoClock - an internet-connected clock
 
+![build-platformio](https://github.com/cwi-dis/iotsaNeoClock/workflows/build-platformio/badge.svg)
+![build-arduino](https://github.com/cwi-dis/iotsaNeoClock/workflows/build-arduino/badge.svg)
+
 A clock comprised of 60 NeoPixel LEDs. Shows the time, but can also show programmable patterns (as alerts) and temporal information (such as expected rainfall for the coming hour). Schematics and building instructions included.
 
 Home page is <https://github.com/cwi-dis/iotsaNeoClock>.

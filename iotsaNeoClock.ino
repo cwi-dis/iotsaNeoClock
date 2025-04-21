@@ -21,6 +21,13 @@
 #include "iotsaFilesBackup.h"
 #include "iotsaSimple.h"
 
+#if 1
+extern "C" {
+  int _gettimeofday_r(struct _reent* unused, struct timeval *tp, void *tzp);
+}
+
+#endif
+
 #define IFDEBUGX if(0)
 
 IotsaApplication application("NeoPixel Clock Server");
@@ -48,7 +55,7 @@ IotsaFilesBackupMod filesBackupMod(application);  // we want backup to clone the
 #define NUM_MIN_LEDS      5
 #define STRIDE_MIN_LEDS   5
 
-#define FIRST_LED_AT_ONE_O_CLOCK // Define for first two clocks, which had first led at 1 o'clock position
+// #define FIRST_LED_AT_ONE_O_CLOCK // Define for first two clocks, which had first led at 1 o'clock position
 #define WITH_BRIGHTNESS   // Define to allow changing of the clock brightness through the web interface
 
 #ifdef WITH_BRIGHTNESS
@@ -101,17 +108,14 @@ void neoClockSetup() {
 }
 
 void neoClockShowSeconds(int seconds, float frac) {
-  float valBefore = frac < 0.3 ? (0.3-frac) : 0;
-  float valAfter = frac > 0.7 ?  (frac-0.7) : 0;
+  float valBefore = frac < 0.2 ? (0.2-frac) : 0;
+  float valAfter = frac > 0.8 ?  (frac-0.8) : 0;
   float valSelf = 1.0-(valBefore+valAfter);
   IFDEBUGX { IotsaSerial.printf("seconds=%d, before=%f, self=%f, after=%f", seconds, valBefore, valSelf, valAfter); IotsaSerial.println(); }
 
-  int ledSelf = FIRST_SEC_LED+seconds;
-  int ledBefore = ledSelf + NUM_LEDS-1;
-  int ledAfter = ledSelf + 1;
-  if (ledBefore >= NUM_LEDS) ledBefore -= NUM_LEDS;
-  if (ledSelf >= NUM_LEDS) ledSelf -= NUM_LEDS;
-  if (ledAfter >= NUM_LEDS) ledAfter -= NUM_LEDS;
+  int ledSelf = (FIRST_SEC_LED+seconds) % NUM_LEDS;
+  int ledBefore = (ledSelf + NUM_LEDS-1) % NUM_LEDS;
+  int ledAfter = (ledSelf + 1) % NUM_LEDS;
   if (valBefore) {
     blendPixel(ledBefore, valBefore, COLOR_SEC);
   }
@@ -126,7 +130,7 @@ void neoClockShowSeconds(int seconds, float frac) {
 void neoClockShowMinutes(int minutes, float frac) {
   int minMod5 = minutes % 5;
   minutes = minutes / 5;
-  IFDEBUGX { IotsaSerial.print("minutes="); IotsaSerial.println(minutes); }
+  IFDEBUGX { IotsaSerial.printf("minutes=%d*5 + %d\n", minMod5, minutes);}
   int firstLed = FIRST_MIN_LED + (minutes*STRIDE_MIN_LEDS);
   if (firstLed >= NUM_LEDS) firstLed -= NUM_LEDS;
 
@@ -290,6 +294,16 @@ bool neoClockShowTemporalStatus() {
   return true;
 }
 
+float getSecondsFraction() {
+#if 1
+  struct timeval tval = {0, 0};
+  _gettimeofday_r(NULL, &tval, NULL);
+  return ((float)tval.tv_usec) / 1000000.0;
+#else
+  return (millis()%1000)/1000.0;
+#endif
+}
+
 void neoClockShowTime() {
   // First see whether we're showing an alert, and return if we are (after showing it)
   if (neoClockShowAlert()) return;
@@ -300,7 +314,7 @@ void neoClockShowTime() {
   neoClockShowStatus();
   neoClockShowTemporalStatus();
   int h = ntpMod.localHours12(), m=ntpMod.localMinutes(), s=ntpMod.localSeconds();
-  neoClockShowSeconds(s, (millis()%1000)/1000.0);
+  neoClockShowSeconds(s, getSecondsFraction());
   neoClockShowMinutes(m, s/60.0);
   neoClockShowHours(h, m/60.0);
   strip.show();
@@ -395,7 +409,11 @@ void neoClockAlert() {
 #else
   Dir d = IOTSA_FS.openDir("/data");
   while (d.next()) {
+#ifdef IOTSA_WITH_SPIFFS
       String alertName = d.fileName().substring(6);
+#else
+      String alertName = d.fileName();
+#endif
       String alertUserName = alertName;
       if (alertUserName.endsWith(".bin")) {
         alertUserName.remove(alertUserName.length()-4);

@@ -60,6 +60,8 @@ CEDT,0,1,3,1,120,CET,0,1,10,1,60
 
 and press _Submit_. 
 
+> The format for the timezone string is called "posix TZ database". You can try looking up your location in <https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv>.
+
 Your clock should now show the correct time.
 
 ## Clock brightness

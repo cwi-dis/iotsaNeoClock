@@ -39,7 +39,7 @@ If you have the LDR you want to somehow position it so that it catches the incid
 
 You need to define (or `#undef`) `WITH_BRIGHTNESS` depending on whether you want to be able to change the clock brightness over the net (and definitely if you have the LDR for auto-brightness).
 
-If you want different colors for the hands your can adapt the `COLOR_SEC`, `COLOR_MIN` and `COLOR_HOUR` defines. If you want different patterns to show the time you need to modify the functions `neoClockShowSeconds()`, `neoClockShowMinutes()` and`neoClockShowHours()`.
+If you want different colors for the hands your can adapt the `COLOR_SEC`, `COLOR_MIN` and `COLOR_HOUR` defines (in `iotsaNeoClockMod.h`). If you want different patterns to show the time you need to modify `IotsaNeoClockMod::updateClockFace()` in `iotsaNeoClockMod.cpp`.
 
 ## Operation
 
@@ -50,6 +50,8 @@ The first time the board boots it creates a Wifi network with a name similar to 
 Visit <http://neoclock.local/ntpconfig> to configure the NTP (Network Time Protocol) server to use (but the default _pool.ntp.org_ will usually work) and your timezone. After about half a minute the clock should have a fix and start displaying the right time. The time is also shown on the ntpconfig page and on the clock homepage.
 
 You can change the brightness of the clock at <http://neoclock.local/brightness>. You can either set a single brightness value, or set _Adapt to ambient light_ and set a minimum and maximum brightness.
+
+You can set the LED rotation offset (which physical LED position corresponds to 12 o'clock -- needed on the first two clocks built, which have their first LED at the 1 o'clock position) at <http://neoclock.local/neoclock>.
 
 ### Alerts
 
@@ -62,30 +64,30 @@ Alerts are intended to be shown programmatically when something interesting has 
 
 ### Status indicators
 
-The clock can also display _status information_, which is intended to be longer-lived. Think of things like "the garden door is open" or "the temperature in the freezer is above -20 C". There are two types of status indicators:
+The clock can also display _status information_, which is intended to be longer-lived. Think of things like "the garden door is open" or "the temperature in the freezer is above -20 C". There are two types of status indicators, each with its own URL:
 
-* the inner ring is used for _main status information_. All 12 LEDs show the same color and intensity.
-* the outer ring is used for _temporal status information_, information for the coming hour. The LEDs all have the same color, but the intensity can vary. This can be used to get a quick visual indication of things like the expected rainfall in the coming hour.
+* <http://neoclock.local/status> -- the inner ring, used for _main status information_. All 12 LEDs show the same color and intensity.
+* <http://neoclock.local/temporal> -- the outer ring, used for _temporal status information_, information for the coming hour. The LEDs all have the same color, but the intensity can vary. This can be used to get a quick visual indication of things like the expected rainfall in the coming hour.
 
 Some example URLs to trigger status indicators:
 
 ```
-http://neoclock.local/alert?status=0x00ff00
+http://neoclock.local/status?color=0x00ff00
 ```
 
 Sets the inner ring to bright green.
 
 ```
-http://neoclock.local/alert?timeout=60&status=0x006600
+http://neoclock.local/status?color=0x006600&timeout=60
 ```
 Sets the inner ring to medium green for 60 seconds, then revert to normal.
 
 ```
-http://neoclock.local/alert?timeout=300&status=/0xff0000
+http://neoclock.local/status?color=0&nextColor=0xff0000&timeout=300
 ```
 Sets the inner ring to normal (unlit) for 5 minutes, then go to a very bright red. This can be used as a watchdog: by re-issuing this command within those 5 minutes the red will never show up. Unless the agent that is responsible for contacting the URL is too late.
 
 ```
-http://neoclock.local/alert?timeout=300&temporalStatus=0xccffff/1.0/0.0/0.0/0.5
+http://neoclock.local/temporal?color=0xccffff&factors=1.0,0.0,0.0,0.5&timeout=300
 ```
-Sets the outer ring with timed information. Where the minute had is pointing is set to 100% lightish blue, 15 minutes into the future to that color with 50% intensity. After 5 minutes the outer ring will revert to normal.
+Sets the outer ring with timed information. Where the minute hand is pointing is set to 100% lightish blue, 15 minutes into the future to that color with 50% intensity. After 5 minutes the outer ring will revert to normal.

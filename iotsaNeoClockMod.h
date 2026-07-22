@@ -94,9 +94,10 @@ private:
   uint32_t colors[NUM_LEDS];
 
   // Runtime-configurable replacement for the old FIRST_LED_AT_ONE_O_CLOCK
-  // compile-time flag -- see cwi-dis/iotsaNeoClock#2. 0 for clocks with the
-  // first LED at 12 o'clock, 11 for the first two clocks built (first LED at
-  // 1 o'clock; equivalent to the old flag's "+11" hour-index adjustment).
+  // compile-time flag -- see cwi-dis/iotsaNeoClock#2. Value is the clock
+  // position (0-11) where LED 0 actually sits: 0 for clocks with the first
+  // LED at 12 o'clock, 1 for the first two clocks built (first LED at the
+  // 1 o'clock spot).
   int ledRotationOffset;
 
   unsigned long lastTimeShown;

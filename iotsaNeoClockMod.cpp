@@ -82,7 +82,7 @@ void IotsaNeoClockMod::updateClockFace(uint32_t colors[NUM_LEDS], const ClockTim
   {
     int hours = time.hours;
     IFDEBUGX { IotsaSerial.print("hours="); IotsaSerial.println(hours); }
-    int firstLed = FIRST_HOUR_LED + ((hours+ledRotationOffset)%12)*STRIDE_HOUR_LEDS;
+    int firstLed = FIRST_HOUR_LED + ((hours-ledRotationOffset+12)%12)*STRIDE_HOUR_LEDS;
     int extraLed = 0;
     // Determine which segment to show the hour hand (depending on whether where
     // at <30 minutes past the hour or >30 minutes past) and
@@ -138,7 +138,7 @@ void IotsaNeoClockMod::updateStatus(uint32_t colors[NUM_LEDS], const StatusState
 void IotsaNeoClockMod::updateTemporalStatus(uint32_t colors[NUM_LEDS], const TemporalStatusState &state, int ledRotationOffset, float brightness) {
   int idx = 0;
   for(int i=0; i<NUM_LEDS; i+=STRIDE_HOUR_LEDS) {
-    int segment = (idx + ledRotationOffset) % 12;
+    int segment = (idx - ledRotationOffset + 12) % 12;
     blendPixel(colors, i, 1.0, state.colors[segment], brightness);
     idx++;
   }
@@ -280,7 +280,7 @@ void IotsaNeoClockMod::handler() {
   if (anyChanged) configSave();
 
   String message = "<html><head><title>NeoClock Configuration</title></head><body><h1>NeoClock Configuration</h1><form>";
-  message += "LED rotation offset (0-11, hour-positions from 12 o'clock to where LED 0 actually sits): ";
+  message += "LED rotation offset (0-11, the clock position where LED 0 actually sits, e.g. 1 if LED 0 is at the 1 o'clock spot): ";
   message += "<input name='ledRotationOffset' value='";
   message += String(ledRotationOffset);
   message += "'><br><input type='submit'></form></body></html>";

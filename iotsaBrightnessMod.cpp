@@ -4,34 +4,31 @@
 void
 IotsaBrightnessMod::handler() {
   bool anyChanged = false;
-  for (uint8_t i=0; i<server->args(); i++) {
-    if (server->argName(i) == "brightness") {
-      int b = server->arg(i).toInt();
-      if (b > 0 && b/100.0 != maxBrightnessFactor) {
-        maxBrightnessFactor = b/100.0;
-        curBrightnessFactor = maxBrightnessFactor;
-        anyChanged = true;
-      }
+  if (server->hasArg("brightness")) {
+    int b = server->arg("brightness").toInt();
+    if (b > 0 && b/100.0 != maxBrightnessFactor) {
+      maxBrightnessFactor = b/100.0;
+      curBrightnessFactor = maxBrightnessFactor;
+      anyChanged = true;
     }
-#ifdef WITH_ADAPTATION
-    if (server->argName(i) == "auto") {
-      String a = server->arg(i);
-      bool na = false;
-      if (a == "yes" || a == "true" || a.toInt() > 0) na = true;
-      if (na != autoBrightness) {
-      	autoBrightness = na;
-      	anyChanged = true;
-      }
-    }
-    if (server->argName(i) == "minBrightness") {
-      int b = server->arg(i).toInt();
-      if (b > 0 && b/100.0 != minBrightnessFactor) {
-        minBrightnessFactor = b/100.0;
-        anyChanged = true;
-      }
-    }
-#endif
   }
+#ifdef WITH_ADAPTATION
+  if (server->hasArg("auto")) {
+    String a = server->arg("auto");
+    bool na = (a == "yes" || a == "true" || a.toInt() > 0);
+    if (na != autoBrightness) {
+      autoBrightness = na;
+      anyChanged = true;
+    }
+  }
+  if (server->hasArg("minBrightness")) {
+    int b = server->arg("minBrightness").toInt();
+    if (b > 0 && b/100.0 != minBrightnessFactor) {
+      minBrightnessFactor = b/100.0;
+      anyChanged = true;
+    }
+  }
+#endif
   if (anyChanged) configSave();
 
   String message = "<html><head><title>Brightness</title></head><body><h1>Brightness</h1><form>";
@@ -57,6 +54,32 @@ IotsaBrightnessMod::handler() {
   server->send(200, "text/html", message);
 }
 
+#ifdef IOTSA_WITH_API
+bool IotsaBrightnessMod::getHandler(const char *path, JsonObject& reply) {
+  reply["brightnessFactor"] = maxBrightnessFactor;
+#ifdef WITH_ADAPTATION
+  reply["autoBrightness"] = autoBrightness;
+  reply["minBrightnessFactor"] = minBrightnessFactor;
+#endif
+  return true;
+}
+
+bool IotsaBrightnessMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
+  bool anyChanged = false;
+  JsonObject reqObj = request.as<JsonObject>();
+  if (getFromRequest<float, float>(reqObj, "brightnessFactor", maxBrightnessFactor)) {
+    curBrightnessFactor = maxBrightnessFactor;
+    anyChanged = true;
+  }
+#ifdef WITH_ADAPTATION
+  if (getFromRequest<bool, bool>(reqObj, "autoBrightness", autoBrightness)) anyChanged = true;
+  if (getFromRequest<float, float>(reqObj, "minBrightnessFactor", minBrightnessFactor)) anyChanged = true;
+#endif
+  if (anyChanged) configSave();
+  return anyChanged;
+}
+#endif // IOTSA_WITH_API
+
 void IotsaBrightnessMod::setup() {
   pinMode(A0, INPUT);
   configLoad();
@@ -64,6 +87,10 @@ void IotsaBrightnessMod::setup() {
 
 void IotsaBrightnessMod::serverSetup() {
   server->on("/brightness", std::bind(&IotsaBrightnessMod::handler, this));
+#ifdef IOTSA_WITH_API
+  api.setup("/api/brightness", true, true);
+  name = "brightness";
+#endif
 }
 
 void IotsaBrightnessMod::configLoad() {
@@ -122,7 +149,7 @@ String IotsaBrightnessMod::info() {
   rv += String(int(lightLevel*100));
   rv += "%";
 #endif
-  rv += ". See <a href='/brightness'>/brightness</a> to change.</p>";
+  rv += ". See <a href='/brightness'>/brightness</a> to change, or <a href='/api/brightness'>/api/brightness</a> for the REST API.</p>";
   return rv;
 }
 

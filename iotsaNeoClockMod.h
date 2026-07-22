@@ -3,12 +3,19 @@
 #include <Esp.h>
 #include <FS.h>
 #include "iotsa.h"
+#include "iotsaApi.h"
 #include "iotsaFS.h"
 #include "iotsaNtp.h"
 #include "NeoClockDisplay.h"
 #include "iotsaBrightnessMod.h"
 
 extern IotsaNtpMod ntpMod;
+
+#ifdef IOTSA_WITH_API
+#define IotsaNeoClockModBaseMod IotsaApiMod
+#else
+#define IotsaNeoClockModBaseMod IotsaMod
+#endif
 
 #define NUM_LEDS          60
 #define FIRST_SEC_LED     0
@@ -41,10 +48,10 @@ struct TemporalStatusState {
   uint32_t colors[12];
 };
 
-class IotsaNeoClockMod : public IotsaMod, public IotsaStatusInterface {
+class IotsaNeoClockMod : public IotsaNeoClockModBaseMod, public IotsaStatusInterface {
 public:
   IotsaNeoClockMod(IotsaApplication &_app, NeoClockDisplay &_display, IotsaBrightnessMod *_brightnessMod=NULL)
-  : IotsaMod(_app),
+  : IotsaNeoClockModBaseMod(_app),
     display(_display),
     brightnessMod(_brightnessMod),
     ledRotationOffset(0),
@@ -65,6 +72,10 @@ public:
   String info() override;
   void showStatus() override; // IotsaStatusInterface, for boot/config-mode feedback
 protected:
+#ifdef IOTSA_WITH_API
+  bool getHandler(const char *path, JsonObject& reply) override;
+  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply) override;
+#endif
   void configLoad() override;
   void configSave() override;
 private:

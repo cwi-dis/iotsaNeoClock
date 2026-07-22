@@ -1,20 +1,27 @@
 #ifndef _IOTSABRIGHTNESS_H_
 #define _IOTSABRIGHTNESS_H_
 #include "iotsa.h"
+#include "iotsaApi.h"
 
 //
 // Define to adjust light level based on ambient light,
 // read from LDR connected to ADC input.
-// Decay determines how fast the light level reacts to 
+// Decay determines how fast the light level reacts to
 // changes in ambient light.
 //
 #define WITH_ADAPTATION
-#define DECAY 40 
+#define DECAY 40
 
-class IotsaBrightnessMod : public IotsaMod {
+#ifdef IOTSA_WITH_API
+#define IotsaBrightnessModBaseMod IotsaApiMod
+#else
+#define IotsaBrightnessModBaseMod IotsaMod
+#endif
+
+class IotsaBrightnessMod : public IotsaBrightnessModBaseMod {
 public:
   IotsaBrightnessMod(IotsaApplication &_app, IotsaAuthMod *_auth=NULL)
-  :	IotsaMod(_app, _auth),
+  :	IotsaBrightnessModBaseMod(_app, _auth),
   curBrightnessFactor(1.0),
   maxBrightnessFactor(1.0)
 #ifdef WITH_ADAPTATION
@@ -23,13 +30,17 @@ public:
   lightLevel(1.0)
 #endif
   {}
-  
+
   void setup() override;
   void serverSetup() override;
   void loop() override;
   String info() override;
   float brightness();
 protected:
+#ifdef IOTSA_WITH_API
+  bool getHandler(const char *path, JsonObject& reply) override;
+  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply) override;
+#endif
   void configLoad() override;
   void configSave() override;
   void handler();

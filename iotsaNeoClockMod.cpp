@@ -260,12 +260,34 @@ void IotsaNeoClockMod::showStatus() {
 }
 
 String IotsaNeoClockMod::info() {
-  String rv = "<p>This is a NeoClock. See <a href='/neoclock'>/neoclock</a> for configuration, ";
+  String rv = "<p>This is a NeoClock. See <a href='/neoclock'>/neoclock</a> (or <a href='/api/neoclock'>/api/neoclock</a>) for configuration, ";
   rv += "<a href='/alert'>/alert</a> to trigger/list alert patterns, ";
   rv += "<a href='/status'>/status</a> to set the main status ring, and ";
   rv += "<a href='/temporal'>/temporal</a> to set the temporal status ring.</p>";
   return rv;
 }
+
+#ifdef IOTSA_WITH_API
+bool IotsaNeoClockMod::getHandler(const char *path, JsonObject& reply) {
+  reply["ledRotationOffset"] = ledRotationOffset;
+  return true;
+}
+
+bool IotsaNeoClockMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
+  bool anyChanged = false;
+  JsonObject reqObj = request.as<JsonObject>();
+  int newOffset;
+  if (getFromRequest<int, int>(reqObj, "ledRotationOffset", newOffset)) {
+    newOffset = ((newOffset % 12) + 12) % 12;
+    if (newOffset != ledRotationOffset) {
+      ledRotationOffset = newOffset;
+      anyChanged = true;
+    }
+  }
+  if (anyChanged) configSave();
+  return anyChanged;
+}
+#endif // IOTSA_WITH_API
 
 void IotsaNeoClockMod::handler() {
   // /neoclock -- module configuration, following the normal iotsa web-form convention.
@@ -387,6 +409,10 @@ void IotsaNeoClockMod::serverSetup() {
   server->on("/alert", std::bind(&IotsaNeoClockMod::alertHandler, this));
   server->on("/status", std::bind(&IotsaNeoClockMod::statusHandler, this));
   server->on("/temporal", std::bind(&IotsaNeoClockMod::temporalStatusHandler, this));
+#ifdef IOTSA_WITH_API
+  api.setup("/api/neoclock", true, true);
+  name = "neoclock";
+#endif
 }
 
 void IotsaNeoClockMod::configLoad() {

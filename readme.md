@@ -49,9 +49,9 @@ The first time the board boots it creates a Wifi network with a name similar to 
 
 Visit <http://neoclock.local/ntpconfig> to configure the NTP (Network Time Protocol) server to use (but the default _pool.ntp.org_ will usually work) and your timezone. After about half a minute the clock should have a fix and start displaying the right time. The time is also shown on the ntpconfig page and on the clock homepage.
 
-You can change the brightness of the clock at <http://neoclock.local/brightness>. You can either set a single brightness value, or set _Adapt to ambient light_ and set a minimum and maximum brightness.
+You can change the brightness of the clock at <http://neoclock.local/brightness> (or, as JSON, at <http://neoclock.local/api/brightness>). You can either set a single brightness value, or set _Adapt to ambient light_ and set a minimum and maximum brightness.
 
-You can set the LED rotation offset (which physical LED position corresponds to 12 o'clock -- needed on the first two clocks built, which have their first LED at the 1 o'clock position) at <http://neoclock.local/neoclock>.
+You can set the LED rotation offset (the clock position where LED 0 actually sits -- needed on the first two clocks built, which have LED 0 at the 1 o'clock position) at <http://neoclock.local/neoclock> (or, as JSON, at <http://neoclock.local/api/neoclock>).
 
 ### Alerts
 

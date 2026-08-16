@@ -32,9 +32,17 @@ IotsaFilesBackupMod filesBackupMod(application);  // we want backup to clone the
 IotsaBrightnessMod brightnessMod(application);
 #endif
 
-#include "NeoPixelStripDisplay.h"
 #include "iotsaNeoClockMod.h"
+
+#ifdef WITH_NEOPIXEL_DISPLAY
+#include "NeoPixelStripDisplay.h"
 NeoPixelStripDisplay neoClockDisplay(NUM_LEDS, NEOPIXEL_PIN);
+#endif
+#ifdef WITH_ROUNDLCD_DISPLAY
+#include "CrowPanelRoundDisplay.h"
+CrowPanelRoundDisplay neoClockDisplay(NUM_LEDS);
+#endif
+
 IotsaNeoClockMod neoClockMod(application, neoClockDisplay,
 #ifdef WITH_BRIGHTNESS
   &brightnessMod

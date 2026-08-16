@@ -9,8 +9,15 @@
 #define EXPANDER_PIN_LCD_RESET   4
 #define EXPANDER_PIN_BACKLIGHT   2
 
-#define RING_RADIUS 100
-#define DOT_RADIUS  4
+// Physical layout (see readme.md): 12 radial 5-LED strips ("spokes"), one per
+// clock-hour position, index 0 at 12 o'clock going clockwise. Within a spoke,
+// LED 0 (data-in) is outermost and LED 4 (data-out) is innermost -- deduced
+// from readme.md ("the last LED being the innermost at the 11 o'clock
+// position", plus the data-in/data-out chaining description).
+#define LEDS_PER_SPOKE 5
+#define OUTER_RADIUS   105
+#define INNER_RADIUS   25
+#define DOT_RADIUS     4
 
 CrowPanelRoundDisplay::LGFX::LGFX() {
   {
@@ -118,9 +125,12 @@ void CrowPanelRoundDisplay::show() {
 }
 
 void CrowPanelRoundDisplay::dotPosition(int index, int &x, int &y) {
-  // index 0 = 12 o'clock, increasing clockwise.
-  float theta = 2*PI*index/numLeds;
-  x = 120 + (int)(RING_RADIUS*sin(theta));
-  y = 120 - (int)(RING_RADIUS*cos(theta));
+  int spoke = index / LEDS_PER_SPOKE;
+  int posInSpoke = index % LEDS_PER_SPOKE;
+  int numSpokes = numLeds / LEDS_PER_SPOKE;
+  float angle = 2*PI*spoke/numSpokes;  // spoke 0 = 12 o'clock, increasing clockwise
+  float radius = OUTER_RADIUS - posInSpoke * ((OUTER_RADIUS - INNER_RADIUS) / (float)(LEDS_PER_SPOKE - 1));
+  x = 120 + (int)(radius*sin(angle));
+  y = 120 - (int)(radius*cos(angle));
 }
 #endif // WITH_ROUNDLCD_DISPLAY

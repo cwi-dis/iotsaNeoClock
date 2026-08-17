@@ -49,7 +49,7 @@ void IotsaNeoClockMod::updateClockFace(uint32_t colors[NUM_LEDS], const ClockTim
     float valSelf = 1.0-(valBefore+valAfter);
     IFDEBUGX { IotsaSerial.printf("seconds=%d, before=%f, self=%f, after=%f", time.seconds, valBefore, valSelf, valAfter); IotsaSerial.println(); }
 
-    int ledSelf = (FIRST_SEC_LED+time.seconds) % NUM_LEDS;
+    int ledSelf = (FIRST_SEC_LED+time.seconds - ledRotationOffset*STRIDE_HOUR_LEDS + NUM_LEDS) % NUM_LEDS;
     int ledBefore = (ledSelf + NUM_LEDS-1) % NUM_LEDS;
     int ledAfter = (ledSelf + 1) % NUM_LEDS;
     if (valBefore) {
@@ -68,7 +68,7 @@ void IotsaNeoClockMod::updateClockFace(uint32_t colors[NUM_LEDS], const ClockTim
     int minMod5 = minutes % 5;
     minutes = minutes / 5;
     IFDEBUGX { IotsaSerial.printf("minutes=%d*5 + %d\n", minMod5, minutes);}
-    int firstLed = FIRST_MIN_LED + (minutes*STRIDE_MIN_LEDS);
+    int firstLed = FIRST_MIN_LED + ((minutes-ledRotationOffset+12)%12)*STRIDE_MIN_LEDS;
     if (firstLed >= NUM_LEDS) firstLed -= NUM_LEDS;
 
     // Set all the pixels corresponding to the minute hand

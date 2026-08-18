@@ -43,10 +43,25 @@ void IotsaNeoClockMod::blendPixel(uint32_t colors[NUM_LEDS], int idx, float fact
 void IotsaNeoClockMod::updateClockFace(uint32_t colors[NUM_LEDS], const ClockTime &time, int ledRotationOffset, float brightness) {
   // Seconds
   {
+    // Transition window (width W on each side of a second boundary): a full
+    // 0..1 handoff between the outgoing and incoming LED, evaluated so that
+    // both sides of a boundary agree exactly at the boundary itself (0.5/0.5)
+    // -- this must stay continuous across the frac=1->0 second rollover, or
+    // the "self" LED's brightness visibly jumps instead of flowing.
+    const float W = 0.2;
     float frac = time.frac;
-    float valBefore = frac < 0.2 ? (0.2-frac) : 0;
-    float valAfter = frac > 0.8 ?  (frac-0.8) : 0;
-    float valSelf = 1.0-(valBefore+valAfter);
+    float valBefore = 0, valAfter = 0, valSelf;
+    if (frac < W) {
+      float s = (frac + W) / (2*W);
+      valSelf = s;
+      valBefore = 1 - s;
+    } else if (frac > 1-W) {
+      float s = (frac - (1-W)) / (2*W);
+      valAfter = s;
+      valSelf = 1 - s;
+    } else {
+      valSelf = 1.0;
+    }
     IFDEBUGX { IotsaSerial.printf("seconds=%d, before=%f, self=%f, after=%f", time.seconds, valBefore, valSelf, valAfter); IotsaSerial.println(); }
 
     int ledSelf = (FIRST_SEC_LED+time.seconds - ledRotationOffset*STRIDE_HOUR_LEDS + NUM_LEDS) % NUM_LEDS;

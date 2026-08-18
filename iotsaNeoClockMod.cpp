@@ -47,8 +47,11 @@ void IotsaNeoClockMod::updateClockFace(uint32_t colors[NUM_LEDS], const ClockTim
     // 0..1 handoff between the outgoing and incoming LED, evaluated so that
     // both sides of a boundary agree exactly at the boundary itself (0.5/0.5)
     // -- this must stay continuous across the frac=1->0 second rollover, or
-    // the "self" LED's brightness visibly jumps instead of flowing.
-    const float W = 0.2;
+    // the "self" LED's brightness visibly jumps instead of flowing. W=0.5
+    // spans the whole second, so there's no held-still plateau at 1.0 --
+    // a narrower W reads as "static, then a quick flick" since most of the
+    // second would then pass with nothing changing.
+    const float W = 0.5;
     float frac = time.frac;
     float valBefore = 0, valAfter = 0, valSelf;
     if (frac < W) {

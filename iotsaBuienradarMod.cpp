@@ -136,7 +136,7 @@ void IotsaBuienradarMod::handler() {
   message += "Latitude: <input name='latitude' value='" + String(latitude, 6) + "'><br>\n";
   message += "Longitude: <input name='longitude' value='" + String(longitude, 6) + "'><br>\n";
   message += "<p>Find your coordinates by right-clicking your location on <a href='https://maps.google.com' target='_blank'>Google Maps</a> and copying the two numbers shown.</p>\n";
-  message += BUIENRADAR_SSLINFO_LABEL " <i>(advanced -- only change if buienradar.nl's certificate changes)</i>:<br>\n";
+  message += "Root CA certificate <i>(advanced -- only change if buienradar.nl's certificate issuer changes)</i>:<br>\n";
   message += "<textarea name='rootCA' rows='10' cols='70'>" + req.sslInfo + "</textarea><br>\n";
   message += "<input type='submit'></form></body></html>";
   server->send(200, "text/html", message);
@@ -187,16 +187,10 @@ void IotsaBuienradarMod::configLoad() {
   cf.get("rootCA", storedSslInfo, "");
   storedSslInfo = unescapeNewlines(storedSslInfo);
   // Self-heals an sslInfo that was saved before the escaping above existed
-  // (silently truncated to just its first line -- on ESP32 that's a bare
-  // "-----BEGIN CERTIFICATE-----" with nothing after it; a fingerprint on
-  // ESP8266 is a single line already, so it was never affected) by falling
-  // back to the compiled-in default whenever the stored value doesn't look
-  // like a complete one.
-#ifdef ESP32
+  // (silently truncated to just its first line, a bare
+  // "-----BEGIN CERTIFICATE-----" with nothing after it) by falling back to
+  // the compiled-in default whenever the stored value isn't valid-looking PEM.
   bool looksValid = storedSslInfo.startsWith("-----BEGIN CERTIFICATE-----") && storedSslInfo.indexOf("-----END CERTIFICATE-----") > 0;
-#else
-  bool looksValid = storedSslInfo.length() == 59; // "XX:XX:...:XX", 20 hex bytes
-#endif
   req.sslInfo = looksValid ? storedSslInfo : String(BUIENRADAR_DEFAULT_SSLINFO);
   req.url = BUIENRADAR_URL;
 }

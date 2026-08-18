@@ -166,52 +166,36 @@ void IotsaNeoClockMod::updateTemporalStatus(uint32_t colors[NUM_LEDS], const Tem
 // Alert playback -- overrides the clock/status/temporalStatus entirely while active.
 // Not blended, not brightness-scaled: alerts are meant to be shown exactly as given.
 //
-static uint32_t read32bin(Stream& s) {
-  int b1 = s.read();
-  int b2 = s.read();
-  int b3 = s.read();
-  int b4 = s.read();
-  if (b4 < 0) return -1;
-  return (b1<<24) | (b2 << 16) | (b3 << 8) | b4;
-}
+// Alert pattern files are plain ascii: each line is "duration r g b r g b
+// ...", one r/g/b triplet per LED, applied starting at LED 0 for the given
+// duration (in milliseconds) before moving to the next line. Playback stops
+// at the first line that doesn't start with a positive duration (in
+// particular, at end of file).
+//
+// They live in iotsa's generic /data upload directory alongside arbitrary
+// other files, so they're named with an ALERT_FILE_PREFIX prefix to keep
+// them distinguishable -- see forEachAlertName() and cwi-dis/iotsaNeoClock#5.
+#define ALERT_FILE_PREFIX "alert-"
 
 bool IotsaNeoClockMod::renderAlert() {
   if (!currentAlert) return false;
   // We need to show an alert, or possibly read a new line from the alert file.
   if (millis() > currentAlertLineEndTime) {
-    if (currentAlertIsBinary) {
-      // Binary data. Read bigendian 32bit integers duration and count.
-      int nextDuration = read32bin(currentAlert);
-      int nextCount = read32bin(currentAlert);
-      if (nextDuration < 0 || nextCount < 0) {
-        currentAlert.close();
-        return false;
-      }
-      currentAlertLineEndTime = millis() + nextDuration;
-      int currentLed = 0;
-      while (currentLed < nextCount) {
-        int rgb = read32bin(currentAlert);
-        display.setPixel(currentLed, rgb);
-        currentLed++;
-      }
-    } else {
-      // Ascii data. Duration, space, space-separated R, G, B values until end of line.
-      int nextDuration = currentAlert.parseInt();
-      if (nextDuration <= 0) {
-        currentAlert.close();
-        return false;
-      }
-      currentAlertLineEndTime = millis() + nextDuration;
-      int currentLed = 0;
-      while (currentAlert.read() == ' ') {
-        int r = currentAlert.parseInt();
-        if (currentAlert.read() != ' ') break;
-        int g = currentAlert.parseInt();
-        if (currentAlert.read() != ' ') break;
-        int b = currentAlert.parseInt();
-        display.setPixel(currentLed, (r<<16)|(g<<8)|b);
-        currentLed++;
-      }
+    int nextDuration = currentAlert.parseInt();
+    if (nextDuration <= 0) {
+      stopAlert();
+      return false;
+    }
+    currentAlertLineEndTime = millis() + nextDuration;
+    int currentLed = 0;
+    while (currentAlert.read() == ' ') {
+      int r = currentAlert.parseInt();
+      if (currentAlert.read() != ' ') break;
+      int g = currentAlert.parseInt();
+      if (currentAlert.read() != ' ') break;
+      int b = currentAlert.parseInt();
+      display.setPixel(currentLed, (r<<16)|(g<<8)|b);
+      currentLed++;
     }
   }
   display.show();
@@ -219,14 +203,38 @@ bool IotsaNeoClockMod::renderAlert() {
 }
 
 bool IotsaNeoClockMod::startAlert(const String &name) {
-  if (currentAlert) {
-    currentAlert.close();
-  }
-  String fileName = "/data/" + name;
+  stopAlert();
+  String fileName = String("/data/") + ALERT_FILE_PREFIX + name;
   currentAlert = IOTSA_FS.open(fileName, "r");
   if (!currentAlert) return false;
-  currentAlertIsBinary = fileName.endsWith(".bin");
+  currentAlertName = name;
   return true;
+}
+
+void IotsaNeoClockMod::stopAlert() {
+  if (currentAlert) currentAlert.close();
+  currentAlertName = "";
+}
+
+void IotsaNeoClockMod::forEachAlertName(std::function<void(const String &alertName)> cb) {
+  static const int prefixLen = sizeof(ALERT_FILE_PREFIX) - 1;
+#ifdef ESP32
+  File d = IOTSA_FS.open("/data");
+  File f = d.openNextFile();
+  while (f) {
+    String fileName = f.name();
+    if (fileName.startsWith("/data/")) fileName = fileName.substring(6);
+    if (fileName.startsWith(ALERT_FILE_PREFIX)) cb(fileName.substring(prefixLen));
+    f = d.openNextFile();
+  }
+#else
+  Dir d = IOTSA_FS.openDir("/data");
+  while (d.next()) {
+    String fileName = d.fileName();
+    if (fileName.startsWith("/data/")) fileName = fileName.substring(6);
+    if (fileName.startsWith(ALERT_FILE_PREFIX)) cb(fileName.substring(prefixLen));
+  }
+#endif
 }
 
 float IotsaNeoClockMod::brightness() {
@@ -288,21 +296,40 @@ String IotsaNeoClockMod::info() {
 #ifdef IOTSA_WITH_API
 bool IotsaNeoClockMod::getHandler(const char *path, JsonObject& reply) {
   reply["ledRotationOffset"] = ledRotationOffset;
+  reply["currentAlert"] = currentAlertName;
+  JsonArray alerts = reply["availableAlerts"].to<JsonArray>();
+  forEachAlertName([&alerts](const String &alertName) {
+    alerts.add(alertName);
+  });
   return true;
 }
 
 bool IotsaNeoClockMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
-  bool anyChanged = false;
   JsonObject reqObj = request.as<JsonObject>();
+
+  bool configChanged = false;
   int newOffset;
   if (getFromRequest<int, int>(reqObj, "ledRotationOffset", newOffset)) {
     newOffset = ((newOffset % 12) + 12) % 12;
     if (newOffset != ledRotationOffset) {
       ledRotationOffset = newOffset;
-      anyChanged = true;
+      configChanged = true;
     }
   }
-  if (anyChanged) configSave();
+  if (configChanged) configSave();
+
+  bool anyChanged = configChanged;
+  String newAlert;
+  if (getFromRequest<const char *, String>(reqObj, "alert", newAlert)) {
+    // Not persisted -- an alert name in a PUT request always triggers or
+    // stops playback immediately, same as /alert?alert=name over HTTP.
+    if (newAlert.length() == 0) {
+      stopAlert();
+    } else {
+      startAlert(newAlert);
+    }
+    anyChanged = true;
+  }
   return anyChanged;
 }
 #endif // IOTSA_WITH_API
@@ -335,6 +362,11 @@ void IotsaNeoClockMod::alertHandler() {
       "/temporal?color=...&factors=... instead of /alert?status=.../?temporalStatus=...");
     return;
   }
+  if (server->hasArg("stop")) {
+    stopAlert();
+    server->send(200, "text/plain", "OK");
+    return;
+  }
   if (server->hasArg("alert")) {
     String alertName = server->arg("alert");
     if (startAlert(alertName)) {
@@ -345,35 +377,13 @@ void IotsaNeoClockMod::alertHandler() {
     return;
   }
   String message = "<html><head><title>Available Alerts</title></head><body><h1>Available Alerts</h1><ul>";
-#ifdef ESP32
-  File d = IOTSA_FS.open("/data");
-  File f = d.openNextFile();
-  while (f) {
-      String alertName = f.name();
-      alertName = alertName.substring(6);
-      String alertUserName = alertName;
-      if (alertUserName.endsWith(".bin")) {
-        alertUserName.remove(alertUserName.length()-4);
-      }
-      message += "<li><a href='/alert?alert=" + IotsaMod::htmlEncode(alertName) + "'>" + IotsaMod::htmlEncode(alertUserName) + "</a></li>";
-      f = d.openNextFile();
-  }
-#else
-  Dir d = IOTSA_FS.openDir("/data");
-  while (d.next()) {
-#ifdef IOTSA_WITH_SPIFFS
-      String alertName = d.fileName().substring(6);
-#else
-      String alertName = d.fileName();
-#endif
-      String alertUserName = alertName;
-      if (alertUserName.endsWith(".bin")) {
-        alertUserName.remove(alertUserName.length()-4);
-      }
-      message += "<li><a href='/alert?alert=" + IotsaMod::htmlEncode(alertName) + "'>" + IotsaMod::htmlEncode(alertUserName) + "</a></li>";
-  }
-#endif
-  message += "</ul><p>To trigger: /alert?alert=name. See <a href='/status'>/status</a> and <a href='/temporal'>/temporal</a> for the status rings.</p></body></html>";
+  forEachAlertName([&message](const String &alertName) {
+    message += "<li><a href='/alert?alert=" + IotsaMod::htmlEncode(alertName) + "'>" + IotsaMod::htmlEncode(alertName) + "</a></li>";
+  });
+  message += "</ul><p>To trigger: /alert?alert=name. To stop: /alert?stop=1. "
+    "Alert files are uploaded via <a href='/upload'>/upload</a>, named \"" ALERT_FILE_PREFIX "&lt;name&gt;\" "
+    "(e.g. \"" ALERT_FILE_PREFIX "Red\"). See <a href='/status'>/status</a> and <a href='/temporal'>/temporal</a> "
+    "for the status rings.</p></body></html>";
   server->send(200, "text/html", message);
 }
 

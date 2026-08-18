@@ -2,6 +2,7 @@
 #define _IOTSANEOCLOCKMOD_H_
 #include <Esp.h>
 #include <FS.h>
+#include <functional>
 #include "iotsa.h"
 #include "iotsaApi.h"
 #include "iotsaFS.h"
@@ -56,7 +57,6 @@ public:
     brightnessMod(_brightnessMod),
     ledRotationOffset(0),
     lastTimeShown(0),
-    currentAlertIsBinary(false),
     currentAlertLineEndTime(0),
     currentStatusColor(0),
     currentStatusColorEndTime(0),
@@ -85,7 +85,14 @@ private:
   void temporalStatusHandler(); // /temporal -- set the outer per-segment ring
   void render();  // recompute colors[] and push it to the display
   bool startAlert(const String &name);
+  void stopAlert();
   bool renderAlert();  // true if an alert is currently active (and was rendered)
+  // Alert pattern files share iotsa's generic /data upload directory with
+  // arbitrary other files, so they're distinguished by an ALERT_FILE_PREFIX
+  // filename prefix rather than by assuming everything in /data is an alert
+  // (see cwi-dis/iotsaNeoClock#5) -- cb is called once per alert, with the
+  // prefix already stripped.
+  void forEachAlertName(std::function<void(const String &alertName)> cb);
   float brightness();
 
   // Data providers: each blends its own contribution into colors[NUM_LEDS].
@@ -114,7 +121,7 @@ private:
   unsigned long lastTimeShown;
 
   File currentAlert;
-  bool currentAlertIsBinary;
+  String currentAlertName;  // "" when no alert is playing
   unsigned long currentAlertLineEndTime;
 
   uint32_t currentStatusColor;

@@ -55,10 +55,10 @@ You can set the LED rotation offset (the clock position where LED 0 actually sit
 
 ### Alerts
 
-The clock can display alerts, which are sequences of patterns, there are sample patterns in [data](data).
+The clock can display alerts, which are sequences of patterns, there are sample patterns in [data/data](data/data).
 Each line consists of 181 numbers: a duration (in milliseconds) and 60 R, G and B values for each of the pixels. Triggering an alert will simply show the lines in order.
 
-Alerts are uploaded via <http://neoclock.local/upload> and then triggered by accessing <http://neoclock.local/alert?alert=inRed>, for example. Alerts can also be converted to a binary form (which may be slightly better for fast patterns), the script _extras/alert2bin.py_ can do the conversion.
+Alerts share the device's generic `/upload` file store with arbitrary other files, so alert pattern files must be named `alert-<name>`, e.g. `alert-Red`. Upload via <http://neoclock.local/upload>, see what's available at <http://neoclock.local/alert> (or, as JSON, at <http://neoclock.local/api/neoclock>, which also reports the currently-playing alert, if any), then trigger with the name *without* the `alert-` prefix, e.g. <http://neoclock.local/alert?alert=Red>. Stop a running alert early with <http://neoclock.local/alert?stop=1>. The same trigger/stop can be done as JSON: `PUT /api/neoclock {"alert": "Red"}` / `{"alert": ""}`.
 
 Alerts are intended to be shown programmatically when something interesting has happened, such as a doorbell being pushed, or a facebook mention, or whatever you can think of. [Igor](https://github.com/cwi-dis/iotsa) is a good way of connecting triggers to alerts.
 

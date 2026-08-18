@@ -1,6 +1,7 @@
 #include "CrowPanelRoundDisplay.h"
 #ifdef WITH_ROUNDLCD_DISPLAY
 #include <Wire.h>
+#include <math.h>
 
 #define I2C_SDA 4
 #define I2C_SCL 5
@@ -108,15 +109,24 @@ uint32_t CrowPanelRoundDisplay::getPixel(int index) {
   return pending[index];
 }
 
+// color565() truncates each channel to 5/6/5 bits, so any raw value below
+// ~8 rounds straight down to zero -- unlike a WS2812's 8-bit PWM, which
+// stays visibly nonzero much further down. Gamma-correct so dim colors
+// (e.g. the tail of a temporal-status comet trail) fade out instead of
+// vanishing well before the NeoPixel backend would.
+static uint8_t gammaCorrect(uint8_t v) {
+  return (uint8_t)(powf(v / 255.0f, 1.0f / 2.2f) * 255.0f + 0.5f);
+}
+
 void CrowPanelRoundDisplay::show() {
   tft.startWrite();
   for (int i=0; i<numLeds; i++) {
     if (pending[i] != lastShown[i]) {
       int x, y;
       dotPosition(i, x, y);
-      uint8_t r = (pending[i] >> 16) & 0xff;
-      uint8_t g = (pending[i] >> 8) & 0xff;
-      uint8_t b = pending[i] & 0xff;
+      uint8_t r = gammaCorrect((pending[i] >> 16) & 0xff);
+      uint8_t g = gammaCorrect((pending[i] >> 8) & 0xff);
+      uint8_t b = gammaCorrect(pending[i] & 0xff);
       tft.fillCircle(x, y, DOT_RADIUS, tft.color565(r, g, b));
       lastShown[i] = pending[i];
     }

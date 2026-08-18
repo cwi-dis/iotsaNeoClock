@@ -138,7 +138,7 @@ void IotsaNeoClockMod::updateStatus(uint32_t colors[NUM_LEDS], const StatusState
 void IotsaNeoClockMod::updateTemporalStatus(uint32_t colors[NUM_LEDS], const TemporalStatusState &state, int ledRotationOffset, float brightness) {
   int idx = 0;
   for(int i=0; i<NUM_LEDS; i+=STRIDE_HOUR_LEDS) {
-    int segment = (idx - ledRotationOffset + 12) % 12;
+    int segment = (idx + ledRotationOffset) % 12;
     blendPixel(colors, i, 1.0, state.colors[segment], brightness);
     idx++;
   }
@@ -382,7 +382,7 @@ void IotsaNeoClockMod::temporalStatusHandler() {
   int red = (color >> 16) & 0xff;
   int green = (color >> 8) & 0xff;
   int blue = color & 0xff;
-  int startIdx = ntpMod.localMinutes() / 5; // Where factors[0] will be displayed
+  int startIdx = (ntpMod.localMinutes() / 5 + 1) % 12; // Where factors[0] will be displayed -- one segment ahead of the minute hand
   String factorsArg = server->hasArg("factors") ? server->arg("factors") : "";
   char *factorsCStr = (char *)factorsArg.c_str();
   for (int idx = 0; idx < 12; idx++) {

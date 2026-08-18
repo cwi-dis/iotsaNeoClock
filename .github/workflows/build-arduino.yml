@@ -24,8 +24,7 @@ jobs:
       matrix:
         arduino-board-fqbn:
         - esp8266:esp8266:nodemcuv2
-#        - esp32:esp32:esp32thing
-      
+
     steps:
     - name: Set iotsa_ref in environment
       run: |

@@ -4,7 +4,11 @@
 #include "iotsaApi.h"
 #include "iotsaRequest.h"
 #include "iotsaNeoClockMod.h"
+#ifdef ESP32
 #include <WiFi.h>
+#else
+#include <ESP8266WiFi.h>
+#endif
 
 #ifdef IOTSA_WITH_API
 #define IotsaBuienradarModBaseMod IotsaApiMod
@@ -29,10 +33,19 @@
 // Rain intensity (mm/h) that maps to a full-brightness (factor 1.0) ring segment.
 #define BUIENRADAR_MAX_INTENSITY_MMH 5.0
 
+// IotsaRequest::send() verifies TLS differently per platform (see
+// iotsaRequest.cpp): ESP32 pins the issuing root CA (WiFiClientSecure::
+// setCACert()), ESP8266 pins the exact leaf certificate's SHA1 fingerprint
+// (BearSSL::WiFiClientSecure::setFingerprint()) -- a cheaper check (no X509
+// chain parsing), but one that breaks on every certificate renewal, not just
+// a CA change. sslInfo's meaning (and this default) therefore differs by
+// platform; the /buienradar form's field label follows suit.
+#ifdef ESP32
 // Root CA for gadgets.buienradar.nl, as of 2026-08-18: DigiCert Global Root G3
 // (valid to 2038-01-15). Overridable via the /buienradar config form if
 // buienradar.nl ever switches CAs before this default is updated.
-#define BUIENRADAR_DEFAULT_ROOTCA \
+#define BUIENRADAR_SSLINFO_LABEL "Root CA certificate"
+#define BUIENRADAR_DEFAULT_SSLINFO \
 "-----BEGIN CERTIFICATE-----\n" \
 "MIICPzCCAcWgAwIBAgIQBVVWvPJepDU1w6QP1atFcjAKBggqhkjOPQQDAzBhMQsw\n" \
 "CQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3d3cu\n" \
@@ -48,6 +61,15 @@
 "oAIwOWZbwmSNuJ5Q3KjVSaLtx9zRSX8XAbjIho9OjIgrqJqpisXRAL34VOKa5Vt8\n" \
 "sycX\n" \
 "-----END CERTIFICATE-----\n"
+#else
+// SHA1 fingerprint of gadgets.buienradar.nl's current leaf certificate, as of
+// 2026-08-18 -- that certificate is only valid until 2027-01-29, so unlike
+// the ESP32 root CA above, THIS DEFAULT WILL EXPIRE and need updating (via
+// the /buienradar config form, or a new firmware build) around then, and
+// again at every renewal after that. See cwi-dis/iotsaNeoClock#7.
+#define BUIENRADAR_SSLINFO_LABEL "Certificate fingerprint (SHA1)"
+#define BUIENRADAR_DEFAULT_SSLINFO "1B:05:3E:50:00:10:3D:7D:82:DD:F9:C5:0A:04:FE:01:FE:7E:98:8D"
+#endif
 
 // Fetches the buienradar.nl rain forecast for a configured lat/lon and drives
 // the clock's outer (temporal status) ring via IotsaNeoClockMod::setTemporalStatus().

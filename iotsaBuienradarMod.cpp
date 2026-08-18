@@ -43,9 +43,16 @@ void IotsaBuienradarMod::poll() {
     IotsaSerial.print(BUIENRADAR_URL);
     IotsaSerial.print("?");
     IotsaSerial.println(query);
+    IotsaSerial.print("IotsaBuienradarMod: free heap before request: ");
+    IotsaSerial.println(ESP.getFreeHeap());
   }
   String body;
-  if (!req.send(query, &body)) {
+  bool ok = req.send(query, &body);
+  IFDEBUG {
+    IotsaSerial.print("IotsaBuienradarMod: free heap after request: ");
+    IotsaSerial.println(ESP.getFreeHeap());
+  }
+  if (!ok) {
     IFDEBUG IotsaSerial.println("IotsaBuienradarMod: request failed");
     return;
   }
@@ -129,7 +136,7 @@ void IotsaBuienradarMod::handler() {
   message += "Latitude: <input name='latitude' value='" + String(latitude, 6) + "'><br>\n";
   message += "Longitude: <input name='longitude' value='" + String(longitude, 6) + "'><br>\n";
   message += "<p>Find your coordinates by right-clicking your location on <a href='https://maps.google.com' target='_blank'>Google Maps</a> and copying the two numbers shown.</p>\n";
-  message += "Root CA certificate <i>(advanced -- only change if buienradar.nl's certificate issuer changes)</i>:<br>\n";
+  message += BUIENRADAR_SSLINFO_LABEL " <i>(advanced -- only change if buienradar.nl's certificate changes)</i>:<br>\n";
   message += "<textarea name='rootCA' rows='10' cols='70'>" + req.sslInfo + "</textarea><br>\n";
   message += "<input type='submit'></form></body></html>";
   server->send(200, "text/html", message);
@@ -176,17 +183,21 @@ void IotsaBuienradarMod::configLoad() {
   enabled = (bool)en;
   cf.get("latitude", latitude, 0.0f);
   cf.get("longitude", longitude, 0.0f);
-  String storedRootCA;
-  cf.get("rootCA", storedRootCA, "");
-  storedRootCA = unescapeNewlines(storedRootCA);
-  // Self-heals a rootCA that was saved before the escaping above existed
-  // (silently truncated to just its first line, "-----BEGIN CERTIFICATE-----"
-  // with nothing after it) by falling back to the compiled-in default
-  // whenever the stored value isn't valid-looking PEM -- checking for both
-  // markers, since a bare BEGIN line alone is exactly what that corruption
-  // leaves behind and would otherwise pass a startsWith-only check.
-  bool looksValid = storedRootCA.startsWith("-----BEGIN CERTIFICATE-----") && storedRootCA.indexOf("-----END CERTIFICATE-----") > 0;
-  req.sslInfo = looksValid ? storedRootCA : String(BUIENRADAR_DEFAULT_ROOTCA);
+  String storedSslInfo;
+  cf.get("rootCA", storedSslInfo, "");
+  storedSslInfo = unescapeNewlines(storedSslInfo);
+  // Self-heals an sslInfo that was saved before the escaping above existed
+  // (silently truncated to just its first line -- on ESP32 that's a bare
+  // "-----BEGIN CERTIFICATE-----" with nothing after it; a fingerprint on
+  // ESP8266 is a single line already, so it was never affected) by falling
+  // back to the compiled-in default whenever the stored value doesn't look
+  // like a complete one.
+#ifdef ESP32
+  bool looksValid = storedSslInfo.startsWith("-----BEGIN CERTIFICATE-----") && storedSslInfo.indexOf("-----END CERTIFICATE-----") > 0;
+#else
+  bool looksValid = storedSslInfo.length() == 59; // "XX:XX:...:XX", 20 hex bytes
+#endif
+  req.sslInfo = looksValid ? storedSslInfo : String(BUIENRADAR_DEFAULT_SSLINFO);
   req.url = BUIENRADAR_URL;
 }
 

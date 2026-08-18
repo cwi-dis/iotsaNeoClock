@@ -28,7 +28,7 @@ jobs:
       matrix:
         board:
         - nodemcuv2
-        - esp32thing
+        - crowpanel128
         build_flags: [""]
 
     steps:

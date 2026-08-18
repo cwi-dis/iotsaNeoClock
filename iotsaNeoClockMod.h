@@ -71,6 +71,10 @@ public:
   void loop() override;
   String info() override;
   void showStatus() override; // IotsaStatusInterface, for boot/config-mode feedback
+  // Set the outer per-5-minute-segment ring directly -- shared by the /temporal
+  // HTTP handler and other in-process data providers (e.g. IotsaBuienradarMod, #7)
+  // that want to drive it without a self-request round trip.
+  void setTemporalStatus(uint32_t color, const float factors[12], uint32_t timeoutSecs=0);
 protected:
 #ifdef IOTSA_WITH_API
   bool getHandler(const char *path, JsonObject& reply) override;

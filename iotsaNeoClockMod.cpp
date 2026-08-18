@@ -252,7 +252,10 @@ void IotsaNeoClockMod::render() {
     currentStatusColorEndTime = 0;
     currentStatusColor = nextStatusColor;
   }
-  // (temporalStatusColor timeout is handled where it's set, see handler())
+  if (temporalStatusColorEndTime && millis() > temporalStatusColorEndTime) {
+    temporalStatusColorEndTime = 0;
+    for (int i=0; i<12; i++) temporalStatusColor[i] = 0;
+  }
 
   for (int i=0; i<NUM_LEDS; i++) colors[i] = 0;
 
@@ -407,12 +410,9 @@ void IotsaNeoClockMod::temporalStatusHandler() {
     return;
   }
   uint32_t color = strtoul(server->arg("color").c_str(), NULL, 0);
-  int red = (color >> 16) & 0xff;
-  int green = (color >> 8) & 0xff;
-  int blue = color & 0xff;
-  int startIdx = (ntpMod.localMinutes() / 5 + 1) % 12; // Where factors[0] will be displayed -- one segment ahead of the minute hand
   String factorsArg = server->hasArg("factors") ? server->arg("factors") : "";
   char *factorsCStr = (char *)factorsArg.c_str();
+  float factors[12];
   for (int idx = 0; idx < 12; idx++) {
     float thisFactor = 1.0; // Default when the factors list runs out
     if (factorsCStr && *factorsCStr) {
@@ -420,11 +420,22 @@ void IotsaNeoClockMod::temporalStatusHandler() {
       if (isnan(thisFactor)) thisFactor = 0;
       if (*factorsCStr == ',') factorsCStr++;
     }
-    temporalStatusColor[(idx+startIdx)%12] = combineRGB(0, thisFactor, red, green, blue);
+    factors[idx] = thisFactor;
   }
   uint32_t timeoutSecs = server->hasArg("timeout") ? server->arg("timeout").toInt() : 0;
-  temporalStatusColorEndTime = timeoutSecs ? millis() + timeoutSecs*1000 : 0;
+  setTemporalStatus(color, factors, timeoutSecs);
   server->send(200, "text/plain", "OK");
+}
+
+void IotsaNeoClockMod::setTemporalStatus(uint32_t color, const float factors[12], uint32_t timeoutSecs) {
+  int red = (color >> 16) & 0xff;
+  int green = (color >> 8) & 0xff;
+  int blue = color & 0xff;
+  int startIdx = (ntpMod.localMinutes() / 5 + 1) % 12; // Where factors[0] will be displayed -- one segment ahead of the minute hand
+  for (int idx = 0; idx < 12; idx++) {
+    temporalStatusColor[(idx+startIdx)%12] = combineRGB(0, factors[idx], red, green, blue);
+  }
+  temporalStatusColorEndTime = timeoutSecs ? millis() + timeoutSecs*1000 : 0;
 }
 
 void IotsaNeoClockMod::setup() {

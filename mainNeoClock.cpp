@@ -51,6 +51,11 @@ IotsaNeoClockMod neoClockMod(application, neoClockDisplay,
 #endif
 );
 
+#ifdef WITH_BUIENRADAR
+#include "iotsaBuienradarMod.h"
+IotsaBuienradarMod buienradarMod(application, neoClockMod);
+#endif
+
 void setup(void){
   application.status = &neoClockMod;
   application.setup();

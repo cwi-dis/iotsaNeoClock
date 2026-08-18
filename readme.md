@@ -91,3 +91,11 @@ Sets the inner ring to normal (unlit) for 5 minutes, then go to a very bright re
 http://neoclock.local/temporal?color=0xccffff&factors=1.0,0.0,0.0,0.5&timeout=300
 ```
 Sets the outer ring with timed information. Where the minute hand is pointing is set to 100% lightish blue, 15 minutes into the future to that color with 50% intensity. After 5 minutes the outer ring will revert to normal.
+
+### Automatic rain forecast (buienradar.nl)
+
+Some NeoClocks have a built-in rain forecast feature: they periodically fetch the precipitation forecast for a configured location from [buienradar.nl](https://www.buienradar.nl) (Netherlands only) and use it to drive the outer ring automatically -- no external process needed to push `/temporal` updates.
+
+If your clock has this feature, configure it at <http://neoclock.local/buienradar> (or, as JSON, at <http://neoclock.local/api/buienradar>): fill in your latitude and longitude -- the easiest way to find them is to right-click your location on Google Maps and copy the two numbers shown from the top of the menu that pops up (not "Copy link", which gives you something else entirely) -- and the outer ring will start showing the forecast for the coming hour automatically. There's also an _Enabled_ switch on that page, in case you ever want to turn the feature off.
+
+If your clock doesn't have this feature, you can still get the same effect yourself: have some external process fetch a forecast periodically and push it to `/temporal`, as shown above.

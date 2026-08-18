@@ -11,9 +11,9 @@ extern "C" {
 // Helper function - combine r/g/b values into rgb with clamping and checking
 //
 uint32_t IotsaNeoClockMod::combineRGB(uint32_t oldRGB, float factor, int red, int green, int blue) {
-  red = (int)(red*factor) + int(red > 0);
-  green = (int)(green*factor) + int(green > 0);
-  blue = (int)(blue*factor) + int(blue > 0);
+  red = (int)(red*factor) + int(red > 0 && factor > 0);
+  green = (int)(green*factor) + int(green > 0 && factor > 0);
+  blue = (int)(blue*factor) + int(blue > 0 && factor > 0);
   red += (oldRGB >> 16) & 0xff;
   green += (oldRGB >> 8) & 0xff;
   blue += oldRGB & 0xff;

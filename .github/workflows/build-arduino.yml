@@ -22,8 +22,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arduino-board-fqbn:
-        - esp8266:esp8266:nodemcuv2
+        # crowpanel128 (ESP32-C3) is deliberately not built here yet -- the
+        # Arduino toolchain fails to compile iotsa itself for ESP32-C3, see
+        # cwi-dis/iotsa#200. It builds fine via PlatformIO (build-platformio.yml).
+        include:
+        - board: nodemcuv2
+          fqbn: esp8266:esp8266:nodemcuv2
+          extra_flags: -DWITH_NEOPIXEL_DISPLAY -DWITH_BUIENRADAR
 
     steps:
     - name: Set iotsa_ref in environment
@@ -65,7 +70,6 @@ jobs:
         arduino-cli lib install --git-url https://github.com/cwi-dis/iotsa#${{ env.iotsa_ref }}
         arduino-cli lib list
 
-    - name: Build for ${{ matrix.arduino-board-fqbn }}
+    - name: Build for ${{ matrix.board }}
       run: |
-        arduino-cli compile --fqbn ${{ matrix.arduino-board-fqbn }}
-  
+        arduino-cli compile --fqbn ${{ matrix.fqbn }} --build-property "compiler.cpp.extra_flags=${{ matrix.extra_flags }}"

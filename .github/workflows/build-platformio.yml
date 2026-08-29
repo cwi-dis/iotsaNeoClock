@@ -27,7 +27,7 @@ jobs:
     strategy:
       matrix:
         board:
-        - nodemcuv2
+        - iotsa_v4
         - crowpanel128
         build_flags: [""]
 

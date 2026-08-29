@@ -296,7 +296,6 @@ String IotsaNeoClockMod::info() {
   return rv;
 }
 
-#ifdef IOTSA_WITH_API
 bool IotsaNeoClockMod::getHandler(const char *path, JsonObject& reply) {
   reply["ledRotationOffset"] = ledRotationOffset;
   reply["currentAlert"] = currentAlertName;
@@ -335,13 +334,12 @@ bool IotsaNeoClockMod::putHandler(const char *path, const JsonVariant& request, 
   }
   return anyChanged;
 }
-#endif // IOTSA_WITH_API
 
-void IotsaNeoClockMod::handler() {
+void IotsaNeoClockMod::webHandler() {
   // /neoclock -- module configuration, following the normal iotsa web-form convention.
   bool anyChanged = false;
-  if (server->hasArg("ledRotationOffset")) {
-    int newOffset = ((server->arg("ledRotationOffset").toInt() % 12) + 12) % 12;
+  if (api.webService->server->hasArg("ledRotationOffset")) {
+    int newOffset = ((api.webService->server->arg("ledRotationOffset").toInt() % 12) + 12) % 12;
     if (newOffset != ledRotationOffset) {
       ledRotationOffset = newOffset;
       anyChanged = true;
@@ -354,63 +352,63 @@ void IotsaNeoClockMod::handler() {
   message += "<input name='ledRotationOffset' value='";
   message += String(ledRotationOffset);
   message += "'><br><input type='submit'></form></body></html>";
-  server->send(200, "text/html", message);
+  api.webService->server->send(200, "text/html", message);
 }
 
 void IotsaNeoClockMod::alertHandler() {
   // /alert -- trigger a named alert pattern, or list the available ones.
-  if (server->hasArg("status") || server->hasArg("temporalStatus")) {
-    server->send(400, "text/plain",
+  if (app.server->hasArg("status") || app.server->hasArg("temporalStatus")) {
+    app.server->send(400, "text/plain",
       "status and temporalStatus have moved: use /status?color=... and "
       "/temporal?color=...&factors=... instead of /alert?status=.../?temporalStatus=...");
     return;
   }
-  if (server->hasArg("stop")) {
+  if (app.server->hasArg("stop")) {
     stopAlert();
-    server->send(200, "text/plain", "OK");
+    app.server->send(200, "text/plain", "OK");
     return;
   }
-  if (server->hasArg("alert")) {
-    String alertName = server->arg("alert");
+  if (app.server->hasArg("alert")) {
+    String alertName = app.server->arg("alert");
     if (startAlert(alertName)) {
-      server->send(200, "text/plain", "OK");
+      app.server->send(200, "text/plain", "OK");
     } else {
-      server->send(404, "text/plain", "Unknown alert " + alertName);
+      app.server->send(404, "text/plain", "Unknown alert " + alertName);
     }
     return;
   }
   String message = "<html><head><title>Available Alerts</title></head><body><h1>Available Alerts</h1><ul>";
   forEachAlertName([&message](const String &alertName) {
-    message += "<li><a href='/alert?alert=" + IotsaMod::htmlEncode(alertName) + "'>" + IotsaMod::htmlEncode(alertName) + "</a></li>";
+    message += "<li><a href='/alert?alert=" + IotsaBaseModule::htmlEncode(alertName) + "'>" + IotsaBaseModule::htmlEncode(alertName) + "</a></li>";
   });
   message += "</ul><p>To trigger: /alert?alert=name. To stop: /alert?stop=1. "
     "Alert files are uploaded via <a href='/upload'>/upload</a>, named \"" ALERT_FILE_PREFIX "&lt;name&gt;\" "
     "(e.g. \"" ALERT_FILE_PREFIX "Red\"). See <a href='/status'>/status</a> and <a href='/temporal'>/temporal</a> "
     "for the status rings.</p></body></html>";
-  server->send(200, "text/html", message);
+  app.server->send(200, "text/html", message);
 }
 
 void IotsaNeoClockMod::statusHandler() {
   // /status -- set the main (inner ring) status indicator.
-  if (!server->hasArg("color")) {
-    server->send(200, "text/plain", "Usage: /status?color=0xrrggbb[&nextColor=0xrrggbb][&timeout=seconds]");
+  if (!app.server->hasArg("color")) {
+    app.server->send(200, "text/plain", "Usage: /status?color=0xrrggbb[&nextColor=0xrrggbb][&timeout=seconds]");
     return;
   }
-  currentStatusColor = strtoul(server->arg("color").c_str(), NULL, 0);
-  nextStatusColor = server->hasArg("nextColor") ? strtoul(server->arg("nextColor").c_str(), NULL, 0) : 0;
-  uint32_t timeoutSecs = server->hasArg("timeout") ? server->arg("timeout").toInt() : 0;
+  currentStatusColor = strtoul(app.server->arg("color").c_str(), NULL, 0);
+  nextStatusColor = app.server->hasArg("nextColor") ? strtoul(app.server->arg("nextColor").c_str(), NULL, 0) : 0;
+  uint32_t timeoutSecs = app.server->hasArg("timeout") ? app.server->arg("timeout").toInt() : 0;
   currentStatusColorEndTime = timeoutSecs ? millis() + timeoutSecs*1000 : 0;
-  server->send(200, "text/plain", "OK");
+  app.server->send(200, "text/plain", "OK");
 }
 
 void IotsaNeoClockMod::temporalStatusHandler() {
   // /temporal -- set the temporal (outer ring, per-5-minute-segment) status indicator.
-  if (!server->hasArg("color")) {
-    server->send(200, "text/plain", "Usage: /temporal?color=0xrrggbb[&factors=1.0,0.5,...][&timeout=seconds]");
+  if (!app.server->hasArg("color")) {
+    app.server->send(200, "text/plain", "Usage: /temporal?color=0xrrggbb[&factors=1.0,0.5,...][&timeout=seconds]");
     return;
   }
-  uint32_t color = strtoul(server->arg("color").c_str(), NULL, 0);
-  String factorsArg = server->hasArg("factors") ? server->arg("factors") : "";
+  uint32_t color = strtoul(app.server->arg("color").c_str(), NULL, 0);
+  String factorsArg = app.server->hasArg("factors") ? app.server->arg("factors") : "";
   char *factorsCStr = (char *)factorsArg.c_str();
   float factors[12];
   for (int idx = 0; idx < 12; idx++) {
@@ -422,9 +420,9 @@ void IotsaNeoClockMod::temporalStatusHandler() {
     }
     factors[idx] = thisFactor;
   }
-  uint32_t timeoutSecs = server->hasArg("timeout") ? server->arg("timeout").toInt() : 0;
+  uint32_t timeoutSecs = app.server->hasArg("timeout") ? app.server->arg("timeout").toInt() : 0;
   setTemporalStatus(color, factors, timeoutSecs);
-  server->send(200, "text/plain", "OK");
+  app.server->send(200, "text/plain", "OK");
 }
 
 void IotsaNeoClockMod::setTemporalStatus(uint32_t color, const float factors[12], uint32_t timeoutSecs) {
@@ -443,15 +441,15 @@ void IotsaNeoClockMod::setup() {
   configLoad();
 }
 
-void IotsaNeoClockMod::serverSetup() {
-  server->on("/neoclock", std::bind(&IotsaNeoClockMod::handler, this));
-  server->on("/alert", std::bind(&IotsaNeoClockMod::alertHandler, this));
-  server->on("/status", std::bind(&IotsaNeoClockMod::statusHandler, this));
-  server->on("/temporal", std::bind(&IotsaNeoClockMod::temporalStatusHandler, this));
-#ifdef IOTSA_WITH_API
-  api.setup("/api/neoclock", true, true);
+void IotsaNeoClockMod::lateSetup() {
   name = "neoclock";
-#endif
+  // /neoclock (the module's own config page) is registered by api.setup() below.
+  // /alert, /status and /temporal are extra routes outside that page, so they're
+  // registered directly on the shared web server.
+  app.server->on("/alert", std::bind(&IotsaNeoClockMod::alertHandler, this));
+  app.server->on("/status", std::bind(&IotsaNeoClockMod::statusHandler, this));
+  app.server->on("/temporal", std::bind(&IotsaNeoClockMod::temporalStatusHandler, this));
+  api.setup("neoclock", true, true);
 }
 
 void IotsaNeoClockMod::configLoad() {

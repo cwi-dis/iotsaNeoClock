@@ -12,16 +12,10 @@
 #define WITH_ADAPTATION
 #define DECAY 40
 
-#ifdef IOTSA_WITH_API
-#define IotsaBrightnessModBaseMod IotsaApiMod
-#else
-#define IotsaBrightnessModBaseMod IotsaMod
-#endif
-
-class IotsaBrightnessMod : public IotsaBrightnessModBaseMod {
+class IotsaBrightnessMod : public IotsaModule {
 public:
   IotsaBrightnessMod(IotsaApplication &_app, IotsaAuthMod *_auth=NULL)
-  :	IotsaBrightnessModBaseMod(_app, _auth),
+  :	IotsaModule(_app, _auth),
   curBrightnessFactor(1.0),
   maxBrightnessFactor(1.0)
 #ifdef WITH_ADAPTATION
@@ -32,18 +26,16 @@ public:
   {}
 
   void setup() override;
-  void serverSetup() override;
+  void lateSetup() override;
   void loop() override;
   String info() override;
   float brightness();
 protected:
-#ifdef IOTSA_WITH_API
   bool getHandler(const char *path, JsonObject& reply) override;
   bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply) override;
-#endif
+  void webHandler() override;
   void configLoad() override;
   void configSave() override;
-  void handler();
   float curBrightnessFactor;
   float maxBrightnessFactor;
 #ifdef WITH_ADAPTATION

@@ -12,12 +12,6 @@
 
 extern IotsaNtpMod ntpMod;
 
-#ifdef IOTSA_WITH_API
-#define IotsaNeoClockModBaseMod IotsaApiMod
-#else
-#define IotsaNeoClockModBaseMod IotsaMod
-#endif
-
 #define NUM_LEDS          60
 #define FIRST_SEC_LED     0
 #define FIRST_MIN_LED     0
@@ -49,10 +43,10 @@ struct TemporalStatusState {
   uint32_t colors[12];
 };
 
-class IotsaNeoClockMod : public IotsaNeoClockModBaseMod, public IotsaStatusInterface {
+class IotsaNeoClockMod : public IotsaModule, public IotsaStatusInterface {
 public:
   IotsaNeoClockMod(IotsaApplication &_app, NeoClockDisplay &_display, IotsaBrightnessMod *_brightnessMod=NULL)
-  : IotsaNeoClockModBaseMod(_app),
+  : IotsaModule(_app),
     display(_display),
     brightnessMod(_brightnessMod),
     ledRotationOffset(0),
@@ -67,7 +61,7 @@ public:
     for (int i=0; i<12; i++) temporalStatusColor[i] = 0;
   }
   void setup() override;
-  void serverSetup() override;
+  void lateSetup() override;
   void loop() override;
   String info() override;
   void showStatus() override; // IotsaStatusInterface, for boot/config-mode feedback
@@ -76,14 +70,12 @@ public:
   // that want to drive it without a self-request round trip.
   void setTemporalStatus(uint32_t color, const float factors[12], uint32_t timeoutSecs=0);
 protected:
-#ifdef IOTSA_WITH_API
   bool getHandler(const char *path, JsonObject& reply) override;
   bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply) override;
-#endif
+  void webHandler() override;   // /neoclock -- module configuration (ledRotationOffset)
   void configLoad() override;
   void configSave() override;
 private:
-  void handler();              // /neoclock -- module configuration (ledRotationOffset)
   void alertHandler();          // /alert -- trigger/list alert patterns
   void statusHandler();         // /status -- set the inner status ring
   void temporalStatusHandler(); // /temporal -- set the outer per-segment ring

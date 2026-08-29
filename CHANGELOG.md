@@ -10,3 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Automatic rain forecast (buienradar.nl) driving the outer status ring, on clocks that have it enabled (#7)
+
+### Changed
+
+- Migrated to iotsa v3 API (`IotsaModule` base class, `lateSetup()`, `webHandler()`, bare `api.setup()` paths) (cwi-dis/iotsa#199)

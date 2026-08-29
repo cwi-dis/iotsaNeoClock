@@ -10,12 +10,6 @@
 #include <ESP8266WiFi.h>
 #endif
 
-#ifdef IOTSA_WITH_API
-#define IotsaBuienradarModBaseMod IotsaApiMod
-#else
-#define IotsaBuienradarModBaseMod IotsaMod
-#endif
-
 // Color used for the rain-forecast ring (dim blue, matching the dimness of
 // the other ring colors in iotsaNeoClockMod.h).
 #define COLOR_RAIN 0x000055
@@ -59,10 +53,10 @@
 // Fetches the buienradar.nl rain forecast for a configured lat/lon and drives
 // the clock's outer (temporal status) ring via IotsaNeoClockMod::setTemporalStatus().
 // See cwi-dis/iotsaNeoClock#7.
-class IotsaBuienradarMod : public IotsaBuienradarModBaseMod {
+class IotsaBuienradarMod : public IotsaModule {
 public:
   IotsaBuienradarMod(IotsaApplication &_app, IotsaNeoClockMod &_neoClockMod, IotsaAuthMod *_auth=NULL)
-  : IotsaBuienradarModBaseMod(_app, _auth),
+  : IotsaModule(_app, _auth),
     neoClockMod(_neoClockMod),
     enabled(true),
     latitude(0.0),
@@ -77,18 +71,16 @@ public:
   {}
 
   void setup() override;
-  void serverSetup() override;
+  void lateSetup() override;
   void loop() override;
   String info() override;
 protected:
-#ifdef IOTSA_WITH_API
   bool getHandler(const char *path, JsonObject& reply) override;
   bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply) override;
-#endif
+  void webHandler() override; // /buienradar -- module configuration (latitude, longitude, rootCA)
   void configLoad() override;
   void configSave() override;
 private:
-  void handler(); // /buienradar -- module configuration (latitude, longitude, rootCA)
   void poll();    // fetch, parse and apply the current forecast
 
   IotsaNeoClockMod &neoClockMod;

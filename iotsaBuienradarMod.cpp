@@ -102,24 +102,24 @@ void IotsaBuienradarMod::loop() {
   poll();
 }
 
-void IotsaBuienradarMod::handler() {
+void IotsaBuienradarMod::webHandler() {
   bool anyChanged = false;
-  if (server->hasArg("enabled")) {
-    String e = server->arg("enabled");
+  if (api.webService->server->hasArg("enabled")) {
+    String e = api.webService->server->arg("enabled");
     bool ne = (e == "yes" || e == "true" || e.toInt() > 0);
     if (ne != enabled) { enabled = ne; anyChanged = true; }
   }
-  if (server->hasArg("latitude")) {
-    float v = server->arg("latitude").toFloat();
+  if (api.webService->server->hasArg("latitude")) {
+    float v = api.webService->server->arg("latitude").toFloat();
     if (v != latitude) { latitude = v; anyChanged = true; }
   }
-  if (server->hasArg("longitude")) {
-    float v = server->arg("longitude").toFloat();
+  if (api.webService->server->hasArg("longitude")) {
+    float v = api.webService->server->arg("longitude").toFloat();
     if (v != longitude) { longitude = v; anyChanged = true; }
   }
-  if (server->hasArg("rootCA")) {
+  if (api.webService->server->hasArg("rootCA")) {
     String v;
-    IotsaMod::percentDecode(server->arg("rootCA"), v);
+    IotsaBaseModule::percentDecode(api.webService->server->arg("rootCA"), v);
     if (v != req.sslInfo) { req.sslInfo = v; anyChanged = true; }
   }
   if (anyChanged) {
@@ -139,10 +139,9 @@ void IotsaBuienradarMod::handler() {
   message += "Root CA certificate <i>(advanced -- only change if buienradar.nl's certificate issuer changes)</i>:<br>\n";
   message += "<textarea name='rootCA' rows='10' cols='70'>" + req.sslInfo + "</textarea><br>\n";
   message += "<input type='submit'></form></body></html>";
-  server->send(200, "text/html", message);
+  api.webService->server->send(200, "text/html", message);
 }
 
-#ifdef IOTSA_WITH_API
 bool IotsaBuienradarMod::getHandler(const char *path, JsonObject& reply) {
   reply["enabled"] = enabled;
   reply["latitude"] = latitude;
@@ -162,18 +161,14 @@ bool IotsaBuienradarMod::putHandler(const char *path, const JsonVariant& request
   }
   return anyChanged;
 }
-#endif // IOTSA_WITH_API
 
 void IotsaBuienradarMod::setup() {
   configLoad();
 }
 
-void IotsaBuienradarMod::serverSetup() {
-  server->on("/buienradar", std::bind(&IotsaBuienradarMod::handler, this));
-#ifdef IOTSA_WITH_API
-  api.setup("/api/buienradar", true, true);
+void IotsaBuienradarMod::lateSetup() {
   name = "buienradar";
-#endif
+  api.setup("buienradar", true, true);
 }
 
 void IotsaBuienradarMod::configLoad() {

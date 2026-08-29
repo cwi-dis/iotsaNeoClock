@@ -2,10 +2,10 @@
 #include "iotsaConfigFile.h"
 
 void
-IotsaBrightnessMod::handler() {
+IotsaBrightnessMod::webHandler() {
   bool anyChanged = false;
-  if (server->hasArg("brightness")) {
-    int b = server->arg("brightness").toInt();
+  if (api.webService->server->hasArg("brightness")) {
+    int b = api.webService->server->arg("brightness").toInt();
     if (b > 0 && b/100.0 != maxBrightnessFactor) {
       maxBrightnessFactor = b/100.0;
       curBrightnessFactor = maxBrightnessFactor;
@@ -13,16 +13,16 @@ IotsaBrightnessMod::handler() {
     }
   }
 #ifdef WITH_ADAPTATION
-  if (server->hasArg("auto")) {
-    String a = server->arg("auto");
+  if (api.webService->server->hasArg("auto")) {
+    String a = api.webService->server->arg("auto");
     bool na = (a == "yes" || a == "true" || a.toInt() > 0);
     if (na != autoBrightness) {
       autoBrightness = na;
       anyChanged = true;
     }
   }
-  if (server->hasArg("minBrightness")) {
-    int b = server->arg("minBrightness").toInt();
+  if (api.webService->server->hasArg("minBrightness")) {
+    int b = api.webService->server->arg("minBrightness").toInt();
     if (b > 0 && b/100.0 != minBrightnessFactor) {
       minBrightnessFactor = b/100.0;
       anyChanged = true;
@@ -51,10 +51,9 @@ IotsaBrightnessMod::handler() {
   message += "%<br>";
 #endif
   message += "<input type='submit'></form></body></html>";
-  server->send(200, "text/html", message);
+  api.webService->server->send(200, "text/html", message);
 }
 
-#ifdef IOTSA_WITH_API
 bool IotsaBrightnessMod::getHandler(const char *path, JsonObject& reply) {
   reply["brightnessFactor"] = maxBrightnessFactor;
 #ifdef WITH_ADAPTATION
@@ -78,19 +77,15 @@ bool IotsaBrightnessMod::putHandler(const char *path, const JsonVariant& request
   if (anyChanged) configSave();
   return anyChanged;
 }
-#endif // IOTSA_WITH_API
 
 void IotsaBrightnessMod::setup() {
   pinMode(A0, INPUT);
   configLoad();
 }
 
-void IotsaBrightnessMod::serverSetup() {
-  server->on("/brightness", std::bind(&IotsaBrightnessMod::handler, this));
-#ifdef IOTSA_WITH_API
-  api.setup("/api/brightness", true, true);
+void IotsaBrightnessMod::lateSetup() {
   name = "brightness";
-#endif
+  api.setup("brightness", true, true);
 }
 
 void IotsaBrightnessMod::configLoad() {

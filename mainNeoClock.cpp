@@ -13,6 +13,19 @@
 #include "iotsaFilesUpload.h"
 #include "iotsaFilesBackup.h"
 
+// Display + optional-feature selection. PlatformIO sets these per board via
+// platformio.ini build_flags: NeoPixel for env:iotsa_v4, round LCD for
+// env:crowpanel128 (an ESP32-C3, PlatformIO only -- the Arduino toolchain
+// can't build iotsa for C3, see cwi-dis/iotsa#200). A plain Arduino IDE build
+// has no build_flags and is always the esp8266 NeoPixel wall clock, so
+// default to that here. (These flags are used only in this file.)
+#if !defined(WITH_NEOPIXEL_DISPLAY) && !defined(WITH_ROUNDLCD_DISPLAY)
+#define WITH_NEOPIXEL_DISPLAY
+#endif
+#ifndef WITH_BUIENRADAR
+#define WITH_BUIENRADAR
+#endif
+
 IotsaApplication application("NeoPixel Clock Server");
 
 // Configure modules we need

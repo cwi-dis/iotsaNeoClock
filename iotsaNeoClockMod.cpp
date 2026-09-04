@@ -260,7 +260,8 @@ void IotsaNeoClockMod::render() {
   for (int i=0; i<NUM_LEDS; i++) colors[i] = 0;
 
   float br = brightness();
-  StatusState statusState = { iotsaConfig.getStatusColor() ? iotsaConfig.getStatusColor() : currentStatusColor };
+  uint32_t statusColor = iotsaStatus.statusColor();
+  StatusState statusState = { statusColor ? statusColor : currentStatusColor };
   updateStatus(colors, statusState, br);
   TemporalStatusState temporalState;
   for (int i=0; i<12; i++) temporalState.colors[i] = temporalStatusColor[i];
@@ -280,7 +281,7 @@ void IotsaNeoClockMod::render() {
 void IotsaNeoClockMod::showStatus() {
   // Called by the framework to show boot/config-mode status (no clock/alert rendering).
   display.clear();
-  StatusState statusState = { iotsaConfig.getStatusColor() };
+  StatusState statusState = { iotsaStatus.statusColor() };
   uint32_t tmpColors[NUM_LEDS];
   for (int i=0; i<NUM_LEDS; i++) tmpColors[i] = 0;
   updateStatus(tmpColors, statusState, 1.0);

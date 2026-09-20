@@ -70,7 +70,6 @@ IotsaBuienradarMod buienradarMod(application, neoClockMod);
 #endif
 
 void setup(void){
-  application.status = &neoClockMod;
   application.setup();
   application.lateSetup();
 #ifndef ESP32

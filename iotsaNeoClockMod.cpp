@@ -278,17 +278,6 @@ void IotsaNeoClockMod::render() {
   display.show();
 }
 
-void IotsaNeoClockMod::showStatus() {
-  // Called by the framework to show boot/config-mode status (no clock/alert rendering).
-  display.clear();
-  StatusState statusState = { iotsaStatus.statusColor() };
-  uint32_t tmpColors[NUM_LEDS];
-  for (int i=0; i<NUM_LEDS; i++) tmpColors[i] = 0;
-  updateStatus(tmpColors, statusState, 1.0);
-  for (int i=0; i<NUM_LEDS; i++) display.setPixel(i, tmpColors[i]);
-  display.show();
-}
-
 String IotsaNeoClockMod::info() {
   String rv = "<p>This is a NeoClock. See <a href='/neoclock'>/neoclock</a> (or <a href='/api/neoclock'>/api/neoclock</a>) for configuration, ";
   rv += "<a href='/alert'>/alert</a> to trigger/list alert patterns, ";

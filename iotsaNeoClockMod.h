@@ -43,7 +43,11 @@ struct TemporalStatusState {
   uint32_t colors[12];
 };
 
-class IotsaNeoClockMod : public IotsaModule, public IotsaStatusInterface {
+// No longer implements IotsaStatusInterface (removed in cwi-dis/iotsa#176) --
+// render() below already polls iotsaStatus.statusColor() every loop() call and
+// overlays it onto the inner ring, so the old push-based showStatus() callback
+// was redundant. See cwi-dis/iotsaNeoClock#9.
+class IotsaNeoClockMod : public IotsaModule {
 public:
   IotsaNeoClockMod(IotsaApplication &_app, NeoClockDisplay &_display, IotsaBrightnessMod *_brightnessMod=NULL)
   : IotsaModule(_app),
@@ -64,7 +68,6 @@ public:
   void lateSetup() override;
   void loop() override;
   String info() override;
-  void showStatus() override; // IotsaStatusInterface, for boot/config-mode feedback
   // Set the outer per-5-minute-segment ring directly -- shared by the /temporal
   // HTTP handler and other in-process data providers (e.g. IotsaBuienradarMod, #7)
   // that want to drive it without a self-request round trip.

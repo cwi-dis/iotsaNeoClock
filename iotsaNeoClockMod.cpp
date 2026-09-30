@@ -1,5 +1,6 @@
 #include "iotsaNeoClockMod.h"
 #include "iotsaConfigFile.h"
+#include "iotsaRunmode.h"
 
 #define IFDEBUGX if(0)
 
@@ -429,6 +430,13 @@ void IotsaNeoClockMod::setTemporalStatus(uint32_t color, const float factors[12]
 void IotsaNeoClockMod::setup() {
   display.begin();
   configLoad();
+  // Identify (cwi-dis/iotsa#133): same two white flashes as IotsaLedMod's default
+  // handler, via the status pulse channel -- render() already shows
+  // iotsaStatus.statusColor() on the inner ring, so no rendering code is needed.
+  IotsaRunmodeMod *runmode = IotsaRunmodeMod::instance();
+  if (runmode) {
+    runmode->addIdentifyCallback([]() { iotsaStatus.setStatusPulse(0xffffff, 300, 300, 1200, "identify"); });
+  }
 }
 
 void IotsaNeoClockMod::lateSetup() {

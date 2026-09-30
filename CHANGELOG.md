@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Automatic rain forecast (buienradar.nl) driving the outer status ring, on clocks that have it enabled (#7)
+- Identify command: two white flashes on the inner ring (cwi-dis/iotsa#133)
 
 ### Changed
 

@@ -38,6 +38,17 @@ void IotsaNeoClockMod::blendPixel(uint32_t colors[NUM_LEDS], int idx, float fact
   colors[idx] = combineRGB(colors[idx], factor, red, green, blue);
 }
 
+// Saturating per-channel add of two already-scaled colors (no factor, so no
+// combineRGB() round-up floor).
+static uint32_t addRGB(uint32_t a, uint32_t b) {
+  uint32_t rv = 0;
+  for (int shift=0; shift<24; shift+=8) {
+    uint32_t c = ((a >> shift) & 0xff) + ((b >> shift) & 0xff);
+    rv |= (c > 255 ? 255 : c) << shift;
+  }
+  return rv;
+}
+
 //
 // Data provider: clock hands (seconds/minutes/hours).
 //
@@ -81,6 +92,11 @@ void IotsaNeoClockMod::updateClockFace(uint32_t colors[NUM_LEDS], const ClockTim
       blendPixel(colors, ledAfter, valAfter, COLOR_SEC, brightness);
     }
   }
+  // Minute and hour hands are drawn into their own buffers so the (shorter)
+  // hour hand can overlay the minute hand instead of blending with it (#11);
+  // the combined hands are then added onto the frame like everything else.
+  uint32_t hands[NUM_LEDS] = {0};
+  uint32_t hourHand[NUM_LEDS] = {0};
   // Minutes
   {
     int minutes = time.minutes;
@@ -92,10 +108,10 @@ void IotsaNeoClockMod::updateClockFace(uint32_t colors[NUM_LEDS], const ClockTim
 
     // Set all the pixels corresponding to the minute hand
     for (int i=firstLed; i<firstLed+NUM_MIN_LEDS; i++) {
-      blendPixel(colors, i, 1.0, COLOR_MIN, brightness);
+      blendPixel(hands, i, 1.0, COLOR_MIN, brightness);
     }
     // And set the one corresponding to the current minute again, to highlight it
-    blendPixel(colors, firstLed+minMod5, 1.0, COLOR_MIN, brightness);
+    blendPixel(hands, firstLed+minMod5, 1.0, COLOR_MIN, brightness);
   }
   // Hours
   {
@@ -131,10 +147,14 @@ void IotsaNeoClockMod::updateClockFace(uint32_t colors[NUM_LEDS], const ClockTim
     // Light up the correct hour hand
     while (firstLed >= NUM_LEDS) firstLed -= NUM_LEDS;
     for (int i=firstLed; i<firstLed+NUM_HOUR_LEDS; i++) {
-      blendPixel(colors, i, 1.0, COLOR_HOUR, brightness);
+      blendPixel(hourHand, i, 1.0, COLOR_HOUR, brightness);
     }
     // And highlight the pixel corresponding to where in the half hour we are
-    blendPixel(colors, firstLed+extraLed, 1.0, COLOR_HOUR, brightness);
+    blendPixel(hourHand, firstLed+extraLed, 1.0, COLOR_HOUR, brightness);
+  }
+  for (int i=0; i<NUM_LEDS; i++) {
+    if (hourHand[i]) hands[i] = hourHand[i];
+    colors[i] = addRGB(colors[i], hands[i]);
   }
 }
 

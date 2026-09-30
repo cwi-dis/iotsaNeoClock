@@ -1,12 +1,12 @@
 #include "iotsaBuienradarMod.h"
 #include "iotsaConfigFile.h"
-#include <math.h>
 
 // buienradar.nl's raintext endpoint: 24 lines of "LLL|HH:MM", one per 5-minute
 // step covering the next 2 hours. We only need the first 12 (the next hour) --
 // that's all setTemporalStatus()'s 12-segment ring can show. LLL is a
-// logarithmic rain-intensity level, converted to mm/h via buienradar's own
-// documented formula.
+// logarithmic rain-intensity level (mm/h = 10^((LLL-109)/32), per buienradar's
+// docs); we map the level itself, not mm/h, onto the ring -- see
+// BUIENRADAR_LEVEL_OFF/_FULL.
 //
 // Note the trailing slash and the 2-decimal-place lat/lon below: the endpoint
 // 302-redirects any request with more than 2 decimal places to a canonical
@@ -14,7 +14,6 @@
 // matching what igor's old pull.sh already truncated to. IotsaRequest doesn't
 // follow redirects, so requesting more precision than that fails outright.
 #define BUIENRADAR_URL "https://gadgets.buienradar.nl/data/raintext/"
-#define BUIENRADAR_LEVEL_TO_MMH(level) (powf(10.0, ((level)-109)/32.0))
 
 // IotsaConfigFileLoad/Save's config files are one "name=value" per line, with
 // '\n' as the record separator -- a multi-line PEM stored verbatim gets cut
@@ -65,16 +64,12 @@ void IotsaBuienradarMod::poll() {
     int barIdx = body.indexOf('|', lineStart);
     if (barIdx > 0 && barIdx < lineEnd) {
       int level = body.substring(lineStart, barIdx).toInt();
-      // level 0 is buienradar's explicit "no rain" sentinel, not just the
-      // bottom of the log scale -- the formula below asymptotes toward but
-      // never reaches 0 mm/h, which previously left a near-zero-but-nonzero
-      // factor that still tripped combineRGB()'s round-up-to-1 floor.
-      float factor = 0.0;
-      if (level > 0) {
-        float mmh = BUIENRADAR_LEVEL_TO_MMH(level);
-        factor = mmh / BUIENRADAR_MAX_INTENSITY_MMH;
-        if (factor > 1.0) factor = 1.0;
-      }
+      // Clamping to exactly 0 matters: any factor > 0 trips combineRGB()'s
+      // round-up-to-1 floor and shows faint dots, including for level 0
+      // (buienradar's explicit "no rain").
+      float factor = (float)(level - BUIENRADAR_LEVEL_OFF) / (BUIENRADAR_LEVEL_FULL - BUIENRADAR_LEVEL_OFF);
+      if (factor < 0.0) factor = 0.0;
+      if (factor > 1.0) factor = 1.0;
       factors[nFactors++] = factor;
     }
     lineStart = lineEnd + 1;

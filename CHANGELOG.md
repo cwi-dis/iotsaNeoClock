@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - esp8266: dropped the `4m3m` flash layout for the nodemcuv2 default (`4m1m`) — restores OTA headroom (the clock only needs ~15KB of LittleFS)
 - esp32c3 (crowpanel): now built with `-DESP32C3`, which was previously missing
 - Status colour now read via `iotsaStatus.statusColor()` (was `iotsaConfig.getStatusColor()`, moved in cwi-dis/iotsa#243)
+- Rain ring uses igor's brighter teal colour and level-based scaling again (#11)
 
 ### Removed
 

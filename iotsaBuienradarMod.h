@@ -10,9 +10,9 @@
 #include <ESP8266WiFi.h>
 #endif
 
-// Color used for the rain-forecast ring (dim blue, matching the dimness of
-// the other ring colors in iotsaNeoClockMod.h).
-#define COLOR_RAIN 0x000055
+// Color used for the rain-forecast ring: the teal igor's neoclock plugin used,
+// restored because the pure-blue 0x000055 that replaced it looked too dark (#11).
+#define COLOR_RAIN 0x206060
 
 // Poll interval -- matches buienradar's own 5-minute forecast granularity,
 // and the "reasonable, non-abusive interval" conclusion from #7's investigation.
@@ -24,8 +24,12 @@
 // forever) if the next poll doesn't land either.
 #define BUIENRADAR_STATUS_TIMEOUT_SECS (6UL*60UL)
 
-// Rain intensity (mm/h) that maps to a full-brightness (factor 1.0) ring segment.
-#define BUIENRADAR_MAX_INTENSITY_MMH 5.0
+// Rain level -> ring-segment factor, linear in buienradar's logarithmic level
+// (not in mm/h), as igor's neoclock plugin did: level*0.01-0.4, clamped to 0..1.
+// Level 40 (~0.007 mm/h) and below is off, level 140 (~9 mm/h) is full
+// brightness, so light rain (~0.3 mm/h) already shows at about half (#11).
+#define BUIENRADAR_LEVEL_OFF  40
+#define BUIENRADAR_LEVEL_FULL 140
 
 // Root CA for gadgets.buienradar.nl, as of 2026-08-18: DigiCert Global Root G3
 // (valid to 2038-01-15). Overridable via the /buienradar config form if

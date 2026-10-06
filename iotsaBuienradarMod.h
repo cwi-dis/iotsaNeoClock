@@ -59,8 +59,8 @@
 // See cwi-dis/iotsaNeoClock#7.
 class IotsaBuienradarMod : public IotsaModule {
 public:
-  IotsaBuienradarMod(IotsaApplication &_app, IotsaNeoClockMod &_neoClockMod, IotsaAuthMod *_auth=NULL)
-  : IotsaModule(_app, _auth),
+  IotsaBuienradarMod(IotsaApplication &_app, IotsaNeoClockMod &_neoClockMod)
+  : IotsaModule(_app),
     neoClockMod(_neoClockMod),
     enabled(true),
     latitude(0.0),

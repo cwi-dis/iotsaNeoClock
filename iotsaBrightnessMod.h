@@ -14,8 +14,8 @@
 
 class IotsaBrightnessMod : public IotsaModule {
 public:
-  IotsaBrightnessMod(IotsaApplication &_app, IotsaAuthMod *_auth=NULL)
-  :	IotsaModule(_app, _auth),
+  IotsaBrightnessMod(IotsaApplication &_app)
+  :	IotsaModule(_app),
   curBrightnessFactor(1.0),
   maxBrightnessFactor(1.0)
 #ifdef WITH_ADAPTATION

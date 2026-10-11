@@ -63,7 +63,7 @@ bool IotsaBrightnessMod::getHandler(const char *path, JsonObject& reply) {
   return true;
 }
 
-bool IotsaBrightnessMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
+bool IotsaBrightnessMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed) {
   bool anyChanged = false;
   JsonObject reqObj = request.as<JsonObject>();
   if (getFromRequest<float, float>(reqObj, "brightnessFactor", maxBrightnessFactor)) {
@@ -75,7 +75,8 @@ bool IotsaBrightnessMod::putHandler(const char *path, const JsonVariant& request
   if (getFromRequest<float, float>(reqObj, "minBrightnessFactor", minBrightnessFactor)) anyChanged = true;
 #endif
   if (anyChanged) configSave();
-  return anyChanged;
+  if ((anyChanged) && changed) *changed = true;
+  return true;
 }
 
 void IotsaBrightnessMod::setup() {

@@ -144,7 +144,7 @@ bool IotsaBuienradarMod::getHandler(const char *path, JsonObject& reply) {
   return true;
 }
 
-bool IotsaBuienradarMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
+bool IotsaBuienradarMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed) {
   bool anyChanged = false;
   JsonObject reqObj = request.as<JsonObject>();
   if (getFromRequest<bool, bool>(reqObj, "enabled", enabled)) anyChanged = true;
@@ -154,7 +154,8 @@ bool IotsaBuienradarMod::putHandler(const char *path, const JsonVariant& request
     configSave();
     nextPollTime = 0;
   }
-  return anyChanged;
+  if ((anyChanged) && changed) *changed = true;
+  return true;
 }
 
 void IotsaBuienradarMod::setup() {

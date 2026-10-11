@@ -80,7 +80,7 @@ public:
   String info() override;
 protected:
   bool getHandler(const char *path, JsonObject& reply) override;
-  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply) override;
+  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed = nullptr) override;
   void webHandler() override; // /buienradar -- module configuration (latitude, longitude, rootCA)
   void configLoad() override;
   void configSave() override;

@@ -317,7 +317,7 @@ bool IotsaNeoClockMod::getHandler(const char *path, JsonObject& reply) {
   return true;
 }
 
-bool IotsaNeoClockMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
+bool IotsaNeoClockMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed) {
   JsonObject reqObj = request.as<JsonObject>();
 
   bool configChanged = false;
@@ -343,7 +343,8 @@ bool IotsaNeoClockMod::putHandler(const char *path, const JsonVariant& request, 
     }
     anyChanged = true;
   }
-  return anyChanged;
+  if ((anyChanged) && changed) *changed = true;
+  return true;
 }
 
 void IotsaNeoClockMod::webHandler() {

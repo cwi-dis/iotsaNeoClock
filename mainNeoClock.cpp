@@ -68,9 +68,6 @@ IotsaBuienradarMod buienradarMod(application, neoClockMod);
 void setup(void){
   application.setup();
   application.lateSetup();
-#ifndef ESP32
-  ESP.wdtEnable(WDTO_120MS);
-#endif
 }
 
 void loop(void){

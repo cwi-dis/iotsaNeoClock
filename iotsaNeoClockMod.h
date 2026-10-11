@@ -74,7 +74,7 @@ public:
   void setTemporalStatus(uint32_t color, const float factors[12], uint32_t timeoutSecs=0);
 protected:
   bool getHandler(const char *path, JsonObject& reply) override;
-  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply) override;
+  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed = nullptr) override;
   void webHandler() override;   // /neoclock -- module configuration (ledRotationOffset)
   void configLoad() override;
   void configSave() override;

@@ -26,12 +26,12 @@
 
 // Rain level -> ring-segment factor, linear in buienradar's logarithmic level
 // (not in mm/h), as igor's neoclock plugin did: level*0.01-0.4, clamped to 0..1.
-// Level 40 (~0.007 mm/h) and below is off, level 140 (~9 mm/h) is full
-// brightness, so light rain (~0.3 mm/h) already shows at about half (#11).
+// Level 40 (~0.007 mm/h) and below is off, level 144 (~12 mm/h) is full
+// brightness (#11).
 // The defaults of the levelOff/levelFull settings, which can be tuned on
 // /buienradar while watching the last poll's levels and factors.
 #define BUIENRADAR_LEVEL_OFF  40
-#define BUIENRADAR_LEVEL_FULL 140
+#define BUIENRADAR_LEVEL_FULL 144
 
 // Root CA for gadgets.buienradar.nl, as of 2026-08-18: DigiCert Global Root G3
 // (valid to 2038-01-15). Overridable via the /buienradar config form if

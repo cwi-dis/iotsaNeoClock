@@ -222,7 +222,7 @@ void IotsaBuienradarMod::formHandler_fields(IotsaWebContext& ctx) {
     ctx.argsNeedRight("lighttuning");
     IotsaWebContext::Form form(ctx, "Save", "Rain levels");
     ctx.showField("Off at", "levelOff", levelOff, IotsaWebContext::Saved, "this level and below shows nothing; 40 is about 0.007 mm/h");
-    ctx.showField("Full at", "levelFull", levelFull, IotsaWebContext::Saved, "this level and above is full brightness; 140 is about 9 mm/h");
+    ctx.showField("Full at", "levelFull", levelFull, IotsaWebContext::Saved, "this level and above is full brightness; 144 is about 12 mm/h");
   }
   bool isDefault = req.sslInfo == String(BUIENRADAR_DEFAULT_SSLINFO);
   IotsaWebContext::Form form(ctx, "Save", "Root CA certificate");

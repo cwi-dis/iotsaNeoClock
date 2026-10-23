@@ -339,6 +339,7 @@ void IotsaNeoClockMod::setStatus(uint32_t color, uint32_t nextColor, uint32_t ti
 
 void IotsaNeoClockMod::getHandler(IotsaApiContext& ctx) {
   ctx.show("ledRotationOffset", ledRotationOffset);
+  ctx.show("temporalGamma", temporalGamma);
   ctx.show("currentAlert", currentAlertName);
   JsonArray alerts = ctx.reply()["availableAlerts"].to<JsonArray>();
   forEachAlertName([&alerts](const String &alertName) {
@@ -357,6 +358,16 @@ void IotsaNeoClockMod::putHandler(IotsaApiContext& ctx) {
     int newOffset = ledRotationOffset;
     if (ctx.arg("ledRotationOffset", newOffset, IotsaApiContext::Saved)) {
       ledRotationOffset = ((newOffset % 12) + 12) % 12;
+    }
+    ctx.argsNeedRight("lighttuning");
+    float newGamma = temporalGamma;
+    if (ctx.arg("temporalGamma", newGamma, IotsaApiContext::Saved)) {
+      if (newGamma <= 0) {
+        ctx.error(400, "temporalGamma: more than 0");
+      } else {
+        temporalGamma = newGamma;
+        applyTemporalStatus();
+      }
     }
   }
   bool alert = ctx.argAction("alert", IotsaApiContext::Transient);
@@ -410,6 +421,16 @@ void IotsaNeoClockMod::formHandler_args(IotsaWebContext& ctx) {
   if (ctx.arg("ledRotationOffset", newOffset, IotsaWebContext::Saved)) {
     ledRotationOffset = ((newOffset % 12) + 12) % 12;
   }
+  ctx.argsNeedRight("lighttuning");
+  float newGamma = temporalGamma;
+  if (ctx.arg("temporalGamma", newGamma, IotsaWebContext::Saved)) {
+    if (newGamma <= 0) {
+      ctx.error("Temporal gamma: more than 0.");
+    } else {
+      temporalGamma = newGamma;
+      applyTemporalStatus();
+    }
+  }
 }
 
 void IotsaNeoClockMod::formHandler_fields(IotsaWebContext& ctx) {
@@ -430,6 +451,8 @@ void IotsaNeoClockMod::formHandler_fields(IotsaWebContext& ctx) {
     ctx.argsNeedRight("config");
     IotsaWebContext::Form form(ctx);
     ctx.showField("LED rotation offset", "ledRotationOffset", ledRotationOffset, IotsaWebContext::Saved, "0-11, the clock position where LED 0 sits, e.g. 1 if it is at 1 o'clock");
+    ctx.argsNeedRight("lighttuning");
+    ctx.showField("Temporal gamma", "temporalGamma", temporalGamma, IotsaWebContext::Saved, "the outer ring shows factor^gamma, so a factor looks like that intensity; 1.0: as it is");
   }
 }
 
@@ -488,14 +511,25 @@ void IotsaNeoClockMod::temporalTrigger(IotsaWebContext& ctx) {
 #endif // IOTSA_WITH_WEB
 
 void IotsaNeoClockMod::setTemporalStatus(uint32_t color, const float factors[12], uint32_t timeoutSecs) {
-  int red = (color >> 16) & 0xff;
-  int green = (color >> 8) & 0xff;
-  int blue = color & 0xff;
-  int startIdx = (ntpMod.localMinutes() / 5 + 1) % 12; // Where factors[0] will be displayed -- one segment ahead of the minute hand
-  for (int idx = 0; idx < 12; idx++) {
-    temporalStatusColor[(idx+startIdx)%12] = combineRGB(0, factors[idx], red, green, blue);
-  }
+  temporalColor = color;
+  for (int idx = 0; idx < 12; idx++) temporalFactors[idx] = factors[idx];
+  temporalStartIdx = (ntpMod.localMinutes() / 5 + 1) % 12; // Where factors[0] will be displayed -- one segment ahead of the minute hand
+  applyTemporalStatus();
   temporalStatusColorEndTime = timeoutSecs ? millis() + timeoutSecs*1000 : 0;
+}
+
+void IotsaNeoClockMod::applyTemporalStatus() {
+  int red = (temporalColor >> 16) & 0xff;
+  int green = (temporalColor >> 8) & 0xff;
+  int blue = temporalColor & 0xff;
+  for (int idx = 0; idx < 12; idx++) {
+    float factor = temporalFactors[idx];
+    if (factor < 0) factor = 0;
+    if (factor > 1) factor = 1;
+    // 0 stays 0: combineRGB() rounds anything above 0 up to a faint dot.
+    if (factor > 0) factor = powf(factor, temporalGamma);
+    temporalStatusColor[(idx+temporalStartIdx)%12] = combineRGB(0, factor, red, green, blue);
+  }
 }
 
 void IotsaNeoClockMod::setup() {
@@ -525,11 +559,14 @@ void IotsaNeoClockMod::lateSetup() {
 void IotsaNeoClockMod::configLoad() {
   IotsaConfigFileLoad cf("/config/neoclock.cfg");
   cf.get("ledRotationOffset", ledRotationOffset, 0);
+  cf.get("temporalGamma", temporalGamma, 2.2f);
+  if (temporalGamma <= 0) temporalGamma = 2.2;
 }
 
 void IotsaNeoClockMod::configSave() {
   IotsaConfigFileSave cf("/config/neoclock.cfg");
   cf.put("ledRotationOffset", ledRotationOffset);
+  cf.put("temporalGamma", temporalGamma);
 }
 
 void IotsaNeoClockMod::loop() {

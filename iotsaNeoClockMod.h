@@ -126,6 +126,16 @@ private:
   // 1 o'clock spot).
   int ledRotationOffset;
 
+  // The temporal ring's factors are perceived intensities: the LEDs get
+  // factor^temporalGamma, because LEDs are linear and eyes aren't (#11).
+  // 1.0: the factor as it is.
+  float temporalGamma = 2.2;
+  // The temporal ring as it was set, so a new temporalGamma can redraw it.
+  uint32_t temporalColor = 0;
+  float temporalFactors[12] = {0};
+  int temporalStartIdx = 0;
+  void applyTemporalStatus();
+
   unsigned long lastTimeShown;
 
   File currentAlert;

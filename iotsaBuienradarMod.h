@@ -79,9 +79,15 @@ public:
   void loop() override;
   String info() override;
 protected:
-  bool getHandler(const char *path, JsonObject& reply) override;
-  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed = nullptr) override;
-  void webHandler() override; // /buienradar -- module configuration (latitude, longitude, rootCA)
+  void getHandler(IotsaApiContext& ctx) override;
+  void putHandler(IotsaApiContext& ctx) override;
+#ifdef IOTSA_WITH_WEB
+  String webTitle() override { return "Buienradar rain forecast"; }
+  void formHandler_args(IotsaWebContext& ctx) override;   // /buienradar: enabled, latitude, longitude, rootCA
+  void formHandler_fields(IotsaWebContext& ctx) override;
+#endif
+  // enabled, latitude and longitude, for both contexts.
+  template<class Ctx> bool _args(Ctx& ctx);
   void configLoad() override;
   void configSave() override;
 private:

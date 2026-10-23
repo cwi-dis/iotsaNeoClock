@@ -73,15 +73,24 @@ public:
   // that want to drive it without a self-request round trip.
   void setTemporalStatus(uint32_t color, const float factors[12], uint32_t timeoutSecs=0);
 protected:
-  bool getHandler(const char *path, JsonObject& reply) override;
-  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed = nullptr) override;
-  void webHandler() override;   // /neoclock -- module configuration (ledRotationOffset)
+  void getHandler(IotsaApiContext& ctx) override;
+  void putHandler(IotsaApiContext& ctx) override;
+#ifdef IOTSA_WITH_WEB
+  String webTitle() override { return "NeoClock"; }
+  void formHandler_args(IotsaWebContext& ctx) override;   // /neoclock: alerts, ledRotationOffset
+  void formHandler_fields(IotsaWebContext& ctx) override;
+#endif
   void configLoad() override;
   void configSave() override;
 private:
-  void alertHandler();          // /alert -- trigger/list alert patterns
-  void statusHandler();         // /status -- set the inner status ring
-  void temporalStatusHandler(); // /temporal -- set the outer per-segment ring
+#ifdef IOTSA_WITH_WEB
+  // Triggers, for scripts and other devices: plain URLs, plain text answers.
+  void alertTrigger(IotsaWebContext& ctx);    // /alert?alert=name, /alert?stop=1
+  void statusTrigger(IotsaWebContext& ctx);   // /status: the inner status ring
+  void temporalTrigger(IotsaWebContext& ctx); // /temporal: the outer per-segment ring
+#endif
+  // The inner ring: color now, nextColor after timeoutSecs (0: forever).
+  void setStatus(uint32_t color, uint32_t nextColor, uint32_t timeoutSecs);
   void render();  // recompute colors[] and push it to the display
   bool startAlert(const String &name);
   void stopAlert();

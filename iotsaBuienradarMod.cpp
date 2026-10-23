@@ -97,66 +97,62 @@ void IotsaBuienradarMod::loop() {
   poll();
 }
 
-void IotsaBuienradarMod::webHandler() {
-  bool anyChanged = false;
-  if (api.webService->server->hasArg("enabled")) {
-    String e = api.webService->server->arg("enabled");
-    bool ne = (e == "yes" || e == "true" || e.toInt() > 0);
-    if (ne != enabled) { enabled = ne; anyChanged = true; }
-  }
-  if (api.webService->server->hasArg("latitude")) {
-    float v = api.webService->server->arg("latitude").toFloat();
-    if (v != latitude) { latitude = v; anyChanged = true; }
-  }
-  if (api.webService->server->hasArg("longitude")) {
-    float v = api.webService->server->arg("longitude").toFloat();
-    if (v != longitude) { longitude = v; anyChanged = true; }
-  }
-  if (api.webService->server->hasArg("rootCA")) {
-    String v;
-    IotsaBaseModule::percentDecode(api.webService->server->arg("rootCA"), v);
-    if (v != req.sslInfo) { req.sslInfo = v; anyChanged = true; }
-  }
-  if (anyChanged) {
-    configSave();
-    nextPollTime = 0; // re-poll promptly with the new settings
-  }
-
-  String message = "<html><head><title>Buienradar rain forecast</title></head><body><h1>Buienradar rain forecast</h1><form method='get'>";
-  message += "Enabled:<br><input name='enabled' type='radio' value='yes'";
-  if (enabled) message += " checked";
-  message += "> Yes<br><input name='enabled' type='radio' value='no'";
-  if (!enabled) message += " checked";
-  message += "> No <i>(kill switch, in case the live fetch misbehaves)</i><br>\n";
-  message += "Latitude: <input name='latitude' value='" + String(latitude, 6) + "'><br>\n";
-  message += "Longitude: <input name='longitude' value='" + String(longitude, 6) + "'><br>\n";
-  message += "<p>Find your coordinates by right-clicking your location on <a href='https://maps.google.com' target='_blank'>Google Maps</a> and copying the two numbers shown.</p>\n";
-  message += "Root CA certificate <i>(advanced -- only change if buienradar.nl's certificate issuer changes)</i>:<br>\n";
-  message += "<textarea name='rootCA' rows='10' cols='70'>" + req.sslInfo + "</textarea><br>\n";
-  message += "<input type='submit'></form></body></html>";
-  api.webService->server->send(200, "text/html", message);
+// Everything here is a setting of the clock itself: changing needs "config"
+// (lateSetup()). The coordinates also give away where the clock hangs, the
+// home address: reading them needs "config" too.
+template<class Ctx> bool IotsaBuienradarMod::_args(Ctx& ctx) {
+  bool changed = false;
+  changed |= ctx.arg("enabled", enabled, IotsaContext::Saved);
+  ctx.showsNeedRight("config");
+  changed |= ctx.arg("latitude", latitude, IotsaContext::Saved);
+  changed |= ctx.arg("longitude", longitude, IotsaContext::Saved);
+  return changed;
 }
 
-bool IotsaBuienradarMod::getHandler(const char *path, JsonObject& reply) {
-  reply["enabled"] = enabled;
-  reply["latitude"] = latitude;
-  reply["longitude"] = longitude;
-  return true;
+void IotsaBuienradarMod::getHandler(IotsaApiContext& ctx) {
+  ctx.show("enabled", enabled);
+  ctx.showsNeedRight("config");
+  ctx.show("latitude", latitude);
+  ctx.show("longitude", longitude);
 }
 
-bool IotsaBuienradarMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed) {
-  bool anyChanged = false;
-  JsonObject reqObj = request.as<JsonObject>();
-  if (getFromRequest<bool, bool>(reqObj, "enabled", enabled)) anyChanged = true;
-  if (getFromRequest<float, float>(reqObj, "latitude", latitude)) anyChanged = true;
-  if (getFromRequest<float, float>(reqObj, "longitude", longitude)) anyChanged = true;
-  if (anyChanged) {
-    configSave();
-    nextPollTime = 0;
-  }
-  if ((anyChanged) && changed) *changed = true;
-  return true;
+void IotsaBuienradarMod::putHandler(IotsaApiContext& ctx) {
+  if (_args(ctx)) nextPollTime = 0; // re-poll promptly with the new settings
 }
+
+#ifdef IOTSA_WITH_WEB
+void IotsaBuienradarMod::formHandler_args(IotsaWebContext& ctx) {
+  bool changed = _args(ctx);
+  // Never prefilled: empty leaves it as it is, "clear" goes back to the
+  // compiled-in default.
+  String newCA = req.sslInfo;
+  if (ctx.argPassword("rootCA", newCA, IotsaWebContext::Saved, false, true)) {
+    req.sslInfo = newCA.length() ? newCA : String(BUIENRADAR_DEFAULT_SSLINFO);
+    changed = true;
+  }
+  if (changed && !ctx.failed()) nextPollTime = 0;
+}
+
+void IotsaBuienradarMod::formHandler_fields(IotsaWebContext& ctx) {
+  if (ctx.includesEveryday()) {
+    String status = !enabled ? "disabled" : (latitude == 0.0 && longitude == 0.0) ? "not configured" : "polling every 5 minutes";
+    ctx.showStatus("Rain forecast", "", status);
+    return;
+  }
+  {
+    IotsaWebContext::Form form(ctx);
+    ctx.showCheckbox("Enabled", "enabled", enabled, IotsaWebContext::Saved, "kill switch, in case the live fetch misbehaves");
+    IotsaContext::RightsScope rights(ctx);
+    ctx.showsNeedRight("config");
+    ctx.showField("Latitude", "latitude", latitude, IotsaWebContext::Saved, "right-click your location on Google Maps and copy the two numbers");
+    ctx.showField("Longitude", "longitude", longitude, IotsaWebContext::Saved);
+  }
+  bool isDefault = req.sslInfo == String(BUIENRADAR_DEFAULT_SSLINFO);
+  IotsaWebContext::Form form(ctx, "Save", "Root CA certificate");
+  ctx.showStatus("Root CA", "", isDefault ? "the compiled-in default (DigiCert Global Root G3)" : "set here");
+  ctx.showTextarea("New root CA (PEM)", "rootCA", IotsaWebContext::Saved, "advanced: only when buienradar.nl's certificate issuer changes", !isDefault);
+}
+#endif // IOTSA_WITH_WEB
 
 void IotsaBuienradarMod::setup() {
   configLoad();
@@ -165,6 +161,7 @@ void IotsaBuienradarMod::setup() {
 void IotsaBuienradarMod::lateSetup() {
   name = "buienradar";
   api.setup("buienradar", true, true);
+  changesNeedRight("config");
 }
 
 void IotsaBuienradarMod::configLoad() {
@@ -201,7 +198,7 @@ String IotsaBuienradarMod::info() {
   } else if (latitude == 0.0 && longitude == 0.0) {
     rv += "not configured";
   } else {
-    rv += "for " + String(latitude, 6) + "," + String(longitude, 6);
+    rv += "configured";  // not the coordinates: they give away where the clock hangs
   }
   rv += ". See <a href='/buienradar'>/buienradar</a> to change, or <a href='/api/buienradar'>/api/buienradar</a> for the REST API.</p>";
   return rv;

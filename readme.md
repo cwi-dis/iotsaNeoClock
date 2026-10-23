@@ -49,7 +49,7 @@ The first time the board boots it creates a Wifi network with a name similar to 
 
 Visit <http://neoclock.local/ntpconfig> to configure the NTP (Network Time Protocol) server to use (but the default _pool.ntp.org_ will usually work) and your timezone. After about half a minute the clock should have a fix and start displaying the right time. The time is also shown on the ntpconfig page and on the clock homepage.
 
-You can change the brightness of the clock at <http://neoclock.local/brightness> (or, as JSON, at <http://neoclock.local/api/brightness>). You can either set a single brightness value, or set _Adapt to ambient light_ and set a minimum and maximum brightness.
+You can change the brightness of the clock at <http://neoclock.local/brightness> (or, as JSON, at <http://neoclock.local/api/brightness>). You can either set a single brightness value (0.0 to 1.0), or set _Adapt to ambient light_ and set a minimum and maximum brightness.
 
 You can set the LED rotation offset (the clock position where LED 0 actually sits -- needed on the first two clocks built, which have LED 0 at the 1 o'clock position) at <http://neoclock.local/neoclock> (or, as JSON, at <http://neoclock.local/api/neoclock>).
 
@@ -58,7 +58,7 @@ You can set the LED rotation offset (the clock position where LED 0 actually sit
 The clock can display alerts, which are sequences of patterns, there are sample patterns in [data/data](data/data).
 Each line consists of 181 numbers: a duration (in milliseconds) and 60 R, G and B values for each of the pixels. Triggering an alert will simply show the lines in order.
 
-Alerts share the device's generic `/upload` file store with arbitrary other files, so alert pattern files must be named `alert-<name>`, e.g. `alert-Red`. Upload via <http://neoclock.local/upload>, see what's available at <http://neoclock.local/alert> (or, as JSON, at <http://neoclock.local/api/neoclock>, which also reports the currently-playing alert, if any), then trigger with the name *without* the `alert-` prefix, e.g. <http://neoclock.local/alert?alert=Red>. Stop a running alert early with <http://neoclock.local/alert?stop=1>. The same trigger/stop can be done as JSON: `PUT /api/neoclock {"alert": "Red"}` / `{"alert": ""}`.
+Alerts share the device's generic `/upload` file store with arbitrary other files, so alert pattern files must be named `alert-<name>`, e.g. `alert-Red`. Upload via <http://neoclock.local/upload>, see what's available at <http://neoclock.local/neoclock>, which has a button per alert (or, as JSON, at <http://neoclock.local/api/neoclock>, which also reports the currently-playing alert, if any), then trigger with the name *without* the `alert-` prefix, e.g. <http://neoclock.local/alert?alert=Red>. Stop a running alert early with <http://neoclock.local/alert?stop=1>. The same trigger/stop can be done as JSON: `PUT /api/neoclock {"alert": "Red"}` / `{"alert": ""}`.
 
 Alerts are intended to be shown programmatically when something interesting has happened, such as a doorbell being pushed, or a facebook mention, or whatever you can think of. [Igor](https://github.com/cwi-dis/iotsa) is a good way of connecting triggers to alerts.
 
@@ -91,6 +91,12 @@ Sets the inner ring to normal (unlit) for 5 minutes, then go to a very bright re
 http://neoclock.local/temporal?color=0xccffff&factors=1.0,0.0,0.0,0.5&timeout=300
 ```
 Sets the outer ring with timed information. Where the minute hand is pointing is set to 100% lightish blue, 15 minutes into the future to that color with 50% intensity. After 5 minutes the outer ring will revert to normal.
+
+The same as JSON, with the colors as numbers (JSON has no hexadecimal: 0x00ff00 is 65280): `PUT /api/neoclock {"status": {"color": 65280, "nextColor": 0, "timeout": 60}}` and `PUT /api/neoclock {"temporal": {"color": 13434879, "factors": [1.0, 0.0, 0.0, 0.5], "timeout": 300}}`.
+
+### Users and rights
+
+Until you add a user (at <http://neoclock.local/users>, in configuration mode), everyone on the network can do everything. With users, alerts, the status rings and the brightness stay open to everyone; the LED rotation offset and the rain forecast settings need the right `config` (and reading the forecast's latitude and longitude too, since they give away where the clock hangs); adapting to ambient light needs `lighttuning`.
 
 ### Automatic rain forecast (buienradar.nl)
 

@@ -300,142 +300,192 @@ void IotsaNeoClockMod::render() {
 }
 
 String IotsaNeoClockMod::info() {
-  String rv = "<p>This is a NeoClock. See <a href='/neoclock'>/neoclock</a> (or <a href='/api/neoclock'>/api/neoclock</a>) for configuration, ";
-  rv += "<a href='/alert'>/alert</a> to trigger/list alert patterns, ";
-  rv += "<a href='/status'>/status</a> to set the main status ring, and ";
-  rv += "<a href='/temporal'>/temporal</a> to set the temporal status ring.</p>";
+  String rv = "<p>This is a NeoClock. See <a href='/neoclock'>/neoclock</a> (or <a href='/api/neoclock'>/api/neoclock</a>) for its alerts and configuration. ";
+  rv += "Scripts use /alert?alert=name to play an alert, /status?color=0xrrggbb to set the main status ring, and ";
+  rv += "/temporal?color=0xrrggbb&amp;factors=... to set the temporal status ring.</p>";
   return rv;
 }
 
-bool IotsaNeoClockMod::getHandler(const char *path, JsonObject& reply) {
-  reply["ledRotationOffset"] = ledRotationOffset;
-  reply["currentAlert"] = currentAlertName;
-  JsonArray alerts = reply["availableAlerts"].to<JsonArray>();
-  forEachAlertName([&alerts](const String &alertName) {
-    alerts.add(alertName);
-  });
-  return true;
+// A color as scripts write it: 0xrrggbb (or decimal).
+static bool parseColor(const String& s, uint32_t& color) {
+  if (s.length() == 0) return false;
+  char *end;
+  color = strtoul(s.c_str(), &end, 0);
+  return *end == '\0';
 }
 
-bool IotsaNeoClockMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed) {
-  JsonObject reqObj = request.as<JsonObject>();
-
-  bool configChanged = false;
-  int newOffset;
-  if (getFromRequest<int, int>(reqObj, "ledRotationOffset", newOffset)) {
-    newOffset = ((newOffset % 12) + 12) % 12;
-    if (newOffset != ledRotationOffset) {
-      ledRotationOffset = newOffset;
-      configChanged = true;
-    }
-  }
-  if (configChanged) configSave();
-
-  bool anyChanged = configChanged;
-  String newAlert;
-  if (getFromRequest<const char *, String>(reqObj, "alert", newAlert)) {
-    // Not persisted -- an alert name in a PUT request always triggers or
-    // stops playback immediately, same as /alert?alert=name over HTTP.
-    if (newAlert.length() == 0) {
-      stopAlert();
-    } else {
-      startAlert(newAlert);
-    }
-    anyChanged = true;
-  }
-  if ((anyChanged) && changed) *changed = true;
-  return true;
-}
-
-void IotsaNeoClockMod::webHandler() {
-  // /neoclock -- module configuration, following the normal iotsa web-form convention.
-  bool anyChanged = false;
-  if (api.webService->server->hasArg("ledRotationOffset")) {
-    int newOffset = ((api.webService->server->arg("ledRotationOffset").toInt() % 12) + 12) % 12;
-    if (newOffset != ledRotationOffset) {
-      ledRotationOffset = newOffset;
-      anyChanged = true;
-    }
-  }
-  if (anyChanged) configSave();
-
-  String message = "<html><head><title>NeoClock Configuration</title></head><body><h1>NeoClock Configuration</h1><form>";
-  message += "LED rotation offset (0-11, the clock position where LED 0 actually sits, e.g. 1 if LED 0 is at the 1 o'clock spot): ";
-  message += "<input name='ledRotationOffset' value='";
-  message += String(ledRotationOffset);
-  message += "'><br><input type='submit'></form></body></html>";
-  api.webService->server->send(200, "text/html", message);
-}
-
-void IotsaNeoClockMod::alertHandler() {
-  // /alert -- trigger a named alert pattern, or list the available ones.
-  if (app.server->hasArg("status") || app.server->hasArg("temporalStatus")) {
-    app.server->send(400, "text/plain",
-      "status and temporalStatus have moved: use /status?color=... and "
-      "/temporal?color=...&factors=... instead of /alert?status=.../?temporalStatus=...");
-    return;
-  }
-  if (app.server->hasArg("stop")) {
-    stopAlert();
-    app.server->send(200, "text/plain", "OK");
-    return;
-  }
-  if (app.server->hasArg("alert")) {
-    String alertName = app.server->arg("alert");
-    if (startAlert(alertName)) {
-      app.server->send(200, "text/plain", "OK");
-    } else {
-      app.server->send(404, "text/plain", "Unknown alert " + alertName);
-    }
-    return;
-  }
-  String message = "<html><head><title>Available Alerts</title></head><body><h1>Available Alerts</h1><ul>";
-  forEachAlertName([&message](const String &alertName) {
-    message += "<li><a href='/alert?alert=" + IotsaBaseModule::htmlEncode(alertName) + "'>" + IotsaBaseModule::htmlEncode(alertName) + "</a></li>";
-  });
-  message += "</ul><p>To trigger: /alert?alert=name. To stop: /alert?stop=1. "
-    "Alert files are uploaded via <a href='/upload'>/upload</a>, named \"" ALERT_FILE_PREFIX "&lt;name&gt;\" "
-    "(e.g. \"" ALERT_FILE_PREFIX "Red\"). See <a href='/status'>/status</a> and <a href='/temporal'>/temporal</a> "
-    "for the status rings.</p></body></html>";
-  app.server->send(200, "text/html", message);
-}
-
-void IotsaNeoClockMod::statusHandler() {
-  // /status -- set the main (inner ring) status indicator.
-  if (!app.server->hasArg("color")) {
-    app.server->send(200, "text/plain", "Usage: /status?color=0xrrggbb[&nextColor=0xrrggbb][&timeout=seconds]");
-    return;
-  }
-  currentStatusColor = strtoul(app.server->arg("color").c_str(), NULL, 0);
-  nextStatusColor = app.server->hasArg("nextColor") ? strtoul(app.server->arg("nextColor").c_str(), NULL, 0) : 0;
-  uint32_t timeoutSecs = app.server->hasArg("timeout") ? app.server->arg("timeout").toInt() : 0;
-  currentStatusColorEndTime = timeoutSecs ? millis() + timeoutSecs*1000 : 0;
-  app.server->send(200, "text/plain", "OK");
-}
-
-void IotsaNeoClockMod::temporalStatusHandler() {
-  // /temporal -- set the temporal (outer ring, per-5-minute-segment) status indicator.
-  if (!app.server->hasArg("color")) {
-    app.server->send(200, "text/plain", "Usage: /temporal?color=0xrrggbb[&factors=1.0,0.5,...][&timeout=seconds]");
-    return;
-  }
-  uint32_t color = strtoul(app.server->arg("color").c_str(), NULL, 0);
-  String factorsArg = app.server->hasArg("factors") ? app.server->arg("factors") : "";
-  char *factorsCStr = (char *)factorsArg.c_str();
-  float factors[12];
+// The temporal ring's factors as scripts write them: "1.0,0.5,...", up to
+// 12; missing ones are 1.0.
+static void parseFactors(const String& s, float factors[12]) {
+  const char *p = s.c_str();
   for (int idx = 0; idx < 12; idx++) {
     float thisFactor = 1.0; // Default when the factors list runs out
-    if (factorsCStr && *factorsCStr) {
-      thisFactor = strtod(factorsCStr, &factorsCStr);
+    if (p && *p) {
+      char *end;
+      thisFactor = strtod(p, &end);
       if (isnan(thisFactor)) thisFactor = 0;
-      if (*factorsCStr == ',') factorsCStr++;
+      p = end;
+      if (*p == ',') p++;
     }
     factors[idx] = thisFactor;
   }
-  uint32_t timeoutSecs = app.server->hasArg("timeout") ? app.server->arg("timeout").toInt() : 0;
-  setTemporalStatus(color, factors, timeoutSecs);
-  app.server->send(200, "text/plain", "OK");
 }
+
+void IotsaNeoClockMod::setStatus(uint32_t color, uint32_t nextColor, uint32_t timeoutSecs) {
+  currentStatusColor = color;
+  nextStatusColor = nextColor;
+  currentStatusColorEndTime = timeoutSecs ? millis() + timeoutSecs*1000 : 0;
+}
+
+void IotsaNeoClockMod::getHandler(IotsaApiContext& ctx) {
+  ctx.show("ledRotationOffset", ledRotationOffset);
+  ctx.show("currentAlert", currentAlertName);
+  JsonArray alerts = ctx.reply()["availableAlerts"].to<JsonArray>();
+  forEachAlertName([&alerts](const String &alertName) {
+    alerts.add(alertName);
+  });
+}
+
+// alert (a name, "" stops), status {color, nextColor, timeout} and
+// temporal {color, factors: [12 numbers], timeout} do what the triggers do;
+// colors are numbers here (0xrrggbb, JSON has no hexadecimal).
+// ledRotationOffset is how the clock was built: it needs "config".
+void IotsaNeoClockMod::putHandler(IotsaApiContext& ctx) {
+  {
+    IotsaContext::RightsScope rights(ctx);
+    ctx.argsNeedRight("config");
+    int newOffset = ledRotationOffset;
+    if (ctx.arg("ledRotationOffset", newOffset, IotsaApiContext::Saved)) {
+      ledRotationOffset = ((newOffset % 12) + 12) % 12;
+    }
+  }
+  bool alert = ctx.argAction("alert", IotsaApiContext::Transient);
+  bool status = ctx.argAction("status", IotsaApiContext::Transient);
+  bool temporal = ctx.argAction("temporal", IotsaApiContext::Transient);
+  JsonObject req = ctx.request();
+  if (alert && !req["alert"].is<const char *>()) ctx.error(400, "alert: a name");
+  if (status && !req["status"]["color"].is<uint32_t>()) ctx.error(400, "status: {\"color\": number, ...}");
+  if (temporal && !req["temporal"]["color"].is<uint32_t>()) ctx.error(400, "temporal: {\"color\": number, ...}");
+  if (ctx.failed()) return;
+  if (alert) {
+    String alertName = req["alert"].as<String>();
+    if (alertName.length() == 0) {
+      stopAlert();
+    } else if (!startAlert(alertName)) {
+      ctx.error(404, "Unknown alert " + alertName);
+    }
+  }
+  if (status) {
+    JsonObject s = req["status"];
+    setStatus(s["color"], s["nextColor"] | 0, s["timeout"] | 0);
+  }
+  if (temporal) {
+    JsonObject t = req["temporal"];
+    float factors[12];
+    JsonArray f = t["factors"];
+    for (int idx = 0; idx < 12; idx++) {
+      factors[idx] = (f && idx < (int)f.size()) ? f[idx].as<float>() : 1.0;
+    }
+    setTemporalStatus(t["color"], factors, t["timeout"] | 0);
+  }
+}
+
+#ifdef IOTSA_WITH_WEB
+void IotsaNeoClockMod::formHandler_args(IotsaWebContext& ctx) {
+  if (ctx.argAction("stop", IotsaWebContext::Transient)) {
+    stopAlert();
+    ctx.feedback("Alert stopped.");
+  }
+  String alertName;
+  if (ctx.arg("alert", alertName, IotsaWebContext::Transient)) {
+    if (startAlert(alertName)) {
+      ctx.feedback("Playing " + alertName + ".");
+    } else {
+      ctx.error(404, "Unknown alert " + alertName);
+    }
+  }
+  IotsaContext::RightsScope rights(ctx);
+  ctx.argsNeedRight("config");
+  int newOffset = ledRotationOffset;
+  if (ctx.arg("ledRotationOffset", newOffset, IotsaWebContext::Saved)) {
+    ledRotationOffset = ((newOffset % 12) + 12) % 12;
+  }
+}
+
+void IotsaNeoClockMod::formHandler_fields(IotsaWebContext& ctx) {
+  if (ctx.includesEveryday()) {
+    ctx.showStatus("Alert", "currentAlert", currentAlertName == "" ? String("none") : currentAlertName);
+    ctx << "<h3>Alerts</h3>\n";
+    forEachAlertName([&ctx](const String &alertName) {
+      ctx.showButton("alert", alertName, IotsaWebContext::Transient, alertName.c_str());
+    });
+    if (currentAlertName != "") ctx.showButton("stop", "Stop", IotsaWebContext::Transient);
+    ctx << "<p>Alert patterns are files uploaded on <a href='/upload'>/upload</a>, named \"" ALERT_FILE_PREFIX "&lt;name&gt;\" "
+      "(e.g. \"" ALERT_FILE_PREFIX "Red\"). Scripts use /alert?alert=name and /alert?stop=1, "
+      "/status?color=0xrrggbb[&amp;nextColor=0xrrggbb][&amp;timeout=seconds] and "
+      "/temporal?color=0xrrggbb[&amp;factors=1.0,0.5,...][&amp;timeout=seconds].</p>\n";
+  }
+  if (ctx.includesSettings()) {
+    IotsaContext::RightsScope rights(ctx);
+    ctx.argsNeedRight("config");
+    IotsaWebContext::Form form(ctx);
+    ctx.showField("LED rotation offset", "ledRotationOffset", ledRotationOffset, IotsaWebContext::Saved, "0-11, the clock position where LED 0 sits, e.g. 1 if it is at 1 o'clock");
+  }
+}
+
+void IotsaNeoClockMod::alertTrigger(IotsaWebContext& ctx) {
+  // The status rings had their own URLs since 2026-07 (bfd9a02): say so.
+  String moved;
+  if (ctx.argPeek("status", moved) || ctx.argPeek("temporalStatus", moved)) {
+    ctx.error("status and temporalStatus have moved: use /status?color=... and "
+      "/temporal?color=...&factors=... instead of /alert?status=.../?temporalStatus=...");
+    return;
+  }
+  bool stop = ctx.argAction("stop", IotsaWebContext::Transient);
+  String alertName;
+  bool start = ctx.arg("alert", alertName, IotsaWebContext::Transient);
+  if (ctx.failed()) return;
+  if (stop) {
+    stopAlert();
+  } else if (!start) {
+    ctx.error("Usage: /alert?alert=name or /alert?stop=1. The alerts are listed on /neoclock.");
+  } else if (!startAlert(alertName)) {
+    ctx.error(404, "Unknown alert " + alertName);
+  }
+}
+
+void IotsaNeoClockMod::statusTrigger(IotsaWebContext& ctx) {
+  String color, nextColor;
+  uint32_t timeoutSecs = 0;
+  ctx.arg("color", color, IotsaWebContext::Transient);
+  ctx.arg("nextColor", nextColor, IotsaWebContext::Transient);
+  ctx.arg("timeout", timeoutSecs, IotsaWebContext::Transient);
+  if (ctx.failed()) return;
+  uint32_t c, n = 0;
+  if (!parseColor(color, c) || (nextColor != "" && !parseColor(nextColor, n))) {
+    ctx.error("Usage: /status?color=0xrrggbb[&nextColor=0xrrggbb][&timeout=seconds]");
+    return;
+  }
+  setStatus(c, n, timeoutSecs);
+}
+
+void IotsaNeoClockMod::temporalTrigger(IotsaWebContext& ctx) {
+  String color, factorsArg;
+  uint32_t timeoutSecs = 0;
+  ctx.arg("color", color, IotsaWebContext::Transient);
+  ctx.arg("factors", factorsArg, IotsaWebContext::Transient);
+  ctx.arg("timeout", timeoutSecs, IotsaWebContext::Transient);
+  if (ctx.failed()) return;
+  uint32_t c;
+  if (!parseColor(color, c)) {
+    ctx.error("Usage: /temporal?color=0xrrggbb[&factors=1.0,0.5,...][&timeout=seconds]");
+    return;
+  }
+  float factors[12];
+  parseFactors(factorsArg, factors);
+  setTemporalStatus(c, factors, timeoutSecs);
+}
+#endif // IOTSA_WITH_WEB
 
 void IotsaNeoClockMod::setTemporalStatus(uint32_t color, const float factors[12], uint32_t timeoutSecs) {
   int red = (color >> 16) & 0xff;
@@ -462,13 +512,14 @@ void IotsaNeoClockMod::setup() {
 
 void IotsaNeoClockMod::lateSetup() {
   name = "neoclock";
-  // /neoclock (the module's own config page) is registered by api.setup() below.
-  // /alert, /status and /temporal are extra routes outside that page, so they're
-  // registered directly on the shared web server.
-  app.server->on("/alert", std::bind(&IotsaNeoClockMod::alertHandler, this));
-  app.server->on("/status", std::bind(&IotsaNeoClockMod::statusHandler, this));
-  app.server->on("/temporal", std::bind(&IotsaNeoClockMod::temporalStatusHandler, this));
+  // /neoclock (the module's page) is registered by api.setup() below; /alert,
+  // /status and /temporal are triggers, for scripts and other devices.
   api.setup("neoclock", true, true);
+#ifdef IOTSA_WITH_WEB
+  addTrigger("alert", [this](IotsaWebContext& ctx) { alertTrigger(ctx); });
+  addTrigger("status", [this](IotsaWebContext& ctx) { statusTrigger(ctx); });
+  addTrigger("temporal", [this](IotsaWebContext& ctx) { temporalTrigger(ctx); });
+#endif
 }
 
 void IotsaNeoClockMod::configLoad() {

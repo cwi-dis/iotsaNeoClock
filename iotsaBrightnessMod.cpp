@@ -1,83 +1,73 @@
 #include "iotsaBrightnessMod.h"
 #include "iotsaConfigFile.h"
 
-void
-IotsaBrightnessMod::webHandler() {
-  bool anyChanged = false;
-  if (api.webService->server->hasArg("brightness")) {
-    int b = api.webService->server->arg("brightness").toInt();
-    if (b > 0 && b/100.0 != maxBrightnessFactor) {
-      maxBrightnessFactor = b/100.0;
-      curBrightnessFactor = maxBrightnessFactor;
-      anyChanged = true;
-    }
-  }
+// How bright the clock is, the everyday knob, is open; how it follows the
+// light in the room is tuning, as a lamp's settings are ("lighttuning").
+template<class Ctx> void IotsaBrightnessMod::_args(Ctx& ctx) {
+  float newMax = maxBrightnessFactor;
+  bool maxChanged = ctx.arg("brightnessFactor", newMax, IotsaContext::Saved);
+  IotsaContext::RightsScope rights(ctx);
+  ctx.argsNeedRight("lighttuning");
 #ifdef WITH_ADAPTATION
-  if (api.webService->server->hasArg("auto")) {
-    String a = api.webService->server->arg("auto");
-    bool na = (a == "yes" || a == "true" || a.toInt() > 0);
-    if (na != autoBrightness) {
-      autoBrightness = na;
-      anyChanged = true;
-    }
-  }
-  if (api.webService->server->hasArg("minBrightness")) {
-    int b = api.webService->server->arg("minBrightness").toInt();
-    if (b > 0 && b/100.0 != minBrightnessFactor) {
-      minBrightnessFactor = b/100.0;
-      anyChanged = true;
-    }
-  }
+  float newMin = minBrightnessFactor;
+  bool minChanged = ctx.arg("minBrightnessFactor", newMin, IotsaContext::Saved);
+  ctx.arg("autoBrightness", autoBrightness, IotsaContext::Saved);
 #endif
-  if (anyChanged) configSave();
-
-  String message = "<html><head><title>Brightness</title></head><body><h1>Brightness</h1><form>";
+  if (maxChanged && (newMax <= 0 || newMax > 1)) ctx.error(400, "brightnessFactor: more than 0, at most 1");
 #ifdef WITH_ADAPTATION
-  if (autoBrightness) message += "(Maximum) ";
+  if (minChanged && (newMin < 0 || newMin > 1)) ctx.error(400, "minBrightnessFactor: 0 to 1");
 #endif
-  message += "Brightness (%): <input type='range' min='1' max='100' value='";
-  message += String(int(maxBrightnessFactor*100));
-  message += "' name='brightness'><br>";
-#ifdef WITH_ADAPTATION
-  message += "Adapt to ambient light:<br><input name='auto' type='radio' value='no'";
-  if (!autoBrightness) message += " checked";
-  message += "> No<br><input name='auto' type='radio' value='yes'";
-  if (autoBrightness) message += " checked";
-  message += "> Yes, Minimum Brightness (%): <input type='range' min='1' max='100' value='";
-  message += String(int(minBrightnessFactor*100));
-  message += "' name='minBrightness'><br>";
-  message += "Brightness at current light level: ";
-  message += String(int(brightness()*100));
-  message += "%<br>";
-#endif
-  message += "<input type='submit'></form></body></html>";
-  api.webService->server->send(200, "text/html", message);
-}
-
-bool IotsaBrightnessMod::getHandler(const char *path, JsonObject& reply) {
-  reply["brightnessFactor"] = maxBrightnessFactor;
-#ifdef WITH_ADAPTATION
-  reply["autoBrightness"] = autoBrightness;
-  reply["minBrightnessFactor"] = minBrightnessFactor;
-#endif
-  return true;
-}
-
-bool IotsaBrightnessMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed) {
-  bool anyChanged = false;
-  JsonObject reqObj = request.as<JsonObject>();
-  if (getFromRequest<float, float>(reqObj, "brightnessFactor", maxBrightnessFactor)) {
+  if (ctx.failed()) return;
+  if (maxChanged) {
+    maxBrightnessFactor = newMax;
     curBrightnessFactor = maxBrightnessFactor;
-    anyChanged = true;
   }
 #ifdef WITH_ADAPTATION
-  if (getFromRequest<bool, bool>(reqObj, "autoBrightness", autoBrightness)) anyChanged = true;
-  if (getFromRequest<float, float>(reqObj, "minBrightnessFactor", minBrightnessFactor)) anyChanged = true;
+  if (minChanged) minBrightnessFactor = newMin;
 #endif
-  if (anyChanged) configSave();
-  if ((anyChanged) && changed) *changed = true;
-  return true;
 }
+
+void IotsaBrightnessMod::getHandler(IotsaApiContext& ctx) {
+  ctx.show("brightnessFactor", maxBrightnessFactor);
+#ifdef WITH_ADAPTATION
+  ctx.show("autoBrightness", autoBrightness);
+  ctx.show("minBrightnessFactor", minBrightnessFactor);
+#endif
+}
+
+void IotsaBrightnessMod::putHandler(IotsaApiContext& ctx) {
+  _args(ctx);
+}
+
+#ifdef IOTSA_WITH_WEB
+void IotsaBrightnessMod::formHandler_args(IotsaWebContext& ctx) {
+  _args(ctx);
+}
+
+void IotsaBrightnessMod::formHandler_fields(IotsaWebContext& ctx) {
+  if (ctx.includesEveryday()) {
+    IotsaWebContext::Form form(ctx, "Set");
+#ifdef WITH_ADAPTATION
+    const char *hint = autoBrightness ? "0.0 to 1.0, the maximum while adapting" : "0.0 to 1.0";
+#else
+    const char *hint = "0.0 to 1.0";
+#endif
+    ctx.showField("Brightness", "brightnessFactor", maxBrightnessFactor, IotsaWebContext::Saved, hint);
+#ifdef WITH_ADAPTATION
+    ctx.showStatus("Brightness now", "", String(int(brightness()*100)) + "%");
+#endif
+  }
+#ifdef WITH_ADAPTATION
+  if (ctx.includesSettings()) {
+    IotsaContext::RightsScope rights(ctx);
+    ctx.argsNeedRight("lighttuning");
+    IotsaWebContext::Form form(ctx, "Save", "Adapting to the light in the room");
+    ctx.showCheckbox("Adapt to ambient light", "autoBrightness", autoBrightness, IotsaWebContext::Saved);
+    ctx.showField("Minimum brightness", "minBrightnessFactor", minBrightnessFactor, IotsaWebContext::Saved, "0.0 to 1.0, in the dark");
+  }
+#endif
+}
+#endif // IOTSA_WITH_WEB
 
 void IotsaBrightnessMod::setup() {
   pinMode(A0, INPUT);

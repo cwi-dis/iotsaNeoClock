@@ -31,9 +31,15 @@ public:
   String info() override;
   float brightness();
 protected:
-  bool getHandler(const char *path, JsonObject& reply) override;
-  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed = nullptr) override;
-  void webHandler() override;
+  void getHandler(IotsaApiContext& ctx) override;
+  void putHandler(IotsaApiContext& ctx) override;
+#ifdef IOTSA_WITH_WEB
+  String webTitle() override { return "Brightness"; }
+  void formHandler_args(IotsaWebContext& ctx) override;
+  void formHandler_fields(IotsaWebContext& ctx) override;
+#endif
+  // Both contexts: brightnessFactor is open, adapting to the room is tuning.
+  template<class Ctx> void _args(Ctx& ctx);
   void configLoad() override;
   void configSave() override;
   float curBrightnessFactor;

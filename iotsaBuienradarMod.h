@@ -28,6 +28,8 @@
 // (not in mm/h), as igor's neoclock plugin did: level*0.01-0.4, clamped to 0..1.
 // Level 40 (~0.007 mm/h) and below is off, level 140 (~9 mm/h) is full
 // brightness, so light rain (~0.3 mm/h) already shows at about half (#11).
+// The defaults of the levelOff/levelFull settings, which can be tuned on
+// /buienradar while watching the last poll's levels and factors.
 #define BUIENRADAR_LEVEL_OFF  40
 #define BUIENRADAR_LEVEL_FULL 140
 
@@ -86,12 +88,17 @@ protected:
   void formHandler_args(IotsaWebContext& ctx) override;   // /buienradar: enabled, latitude, longitude, rootCA
   void formHandler_fields(IotsaWebContext& ctx) override;
 #endif
-  // enabled, latitude and longitude, for both contexts.
+  // enabled, latitude and longitude, for both contexts: true if changed.
   template<class Ctx> bool _args(Ctx& ctx);
+  // levelOff and levelFull ("lighttuning"): true if changed.
+  template<class Ctx> bool _levelArgs(Ctx& ctx);
   void configLoad() override;
   void configSave() override;
 private:
   void poll();    // fetch, parse and apply the current forecast
+  // The last poll's levels to factors, with levelOff/levelFull, and the
+  // factors to the ring. Again after a level setting changed.
+  void applyLevels();
 
   IotsaNeoClockMod &neoClockMod;
   IotsaRequest req; // url is fixed in configLoad(); sslInfo doubles as the configurable rootCA
@@ -99,6 +106,17 @@ private:
   float latitude;
   float longitude;
   uint32_t nextPollTime;
+  // Level -> factor: levelOff and below is off, levelFull and above is full.
+  int levelOff = BUIENRADAR_LEVEL_OFF;
+  int levelFull = BUIENRADAR_LEVEL_FULL;
+  // The last poll, to see what the ring shows and why: per segment of the
+  // coming hour the time buienradar gives, its level and the factor.
+  uint32_t lastPollAtMillis = 0;      // 0: no poll yet
+  const char *lastPollStatus = nullptr; // "ok", "request failed", "short response"
+  int lastCount = 0;                  // segments parsed, at most 12
+  char lastTimes[12][6];              // "HH:MM"
+  int lastLevels[12];
+  float lastFactors[12];
 };
 
 #endif

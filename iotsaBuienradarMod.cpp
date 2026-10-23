@@ -51,41 +51,57 @@ void IotsaBuienradarMod::poll() {
     IotsaSerial.print("IotsaBuienradarMod: free heap after request: ");
     IotsaSerial.println(ESP.getFreeHeap());
   }
+  lastPollAtMillis = millis();
   if (!ok) {
     IFDEBUG IotsaSerial.println("IotsaBuienradarMod: request failed");
+    lastPollStatus = "request failed";
     return;
   }
-  float factors[12];
-  int nFactors = 0;
+  int n = 0;
   int lineStart = 0;
-  while (nFactors < 12 && lineStart < (int)body.length()) {
+  while (n < 12 && lineStart < (int)body.length()) {
     int lineEnd = body.indexOf('\n', lineStart);
     if (lineEnd < 0) lineEnd = body.length();
     int barIdx = body.indexOf('|', lineStart);
     if (barIdx > 0 && barIdx < lineEnd) {
-      int level = body.substring(lineStart, barIdx).toInt();
-      // Clamping to exactly 0 matters: any factor > 0 trips combineRGB()'s
-      // round-up-to-1 floor and shows faint dots, including for level 0
-      // (buienradar's explicit "no rain").
-      float factor = (float)(level - BUIENRADAR_LEVEL_OFF) / (BUIENRADAR_LEVEL_FULL - BUIENRADAR_LEVEL_OFF);
-      if (factor < 0.0) factor = 0.0;
-      if (factor > 1.0) factor = 1.0;
-      factors[nFactors++] = factor;
+      lastLevels[n] = body.substring(lineStart, barIdx).toInt();
+      String time = body.substring(barIdx + 1, lineEnd);
+      time.trim();
+      strncpy(lastTimes[n], time.c_str(), sizeof(lastTimes[n]) - 1);
+      lastTimes[n][sizeof(lastTimes[n]) - 1] = '\0';
+      n++;
     }
     lineStart = lineEnd + 1;
   }
-  if (nFactors < 12) {
+  lastCount = n;
+  if (n < 12) {
     IFDEBUG IotsaSerial.println("IotsaBuienradarMod: short/unparseable response, ignoring");
+    lastPollStatus = "short response";
     return;
   }
+  lastPollStatus = "ok";
+  applyLevels();
+}
+
+void IotsaBuienradarMod::applyLevels() {
+  if (lastCount < 12) return;
   float maxFactor = 0;
-  for (int i = 0; i < 12; i++) if (factors[i] > maxFactor) maxFactor = factors[i];
+  for (int i = 0; i < 12; i++) {
+    // Clamping to exactly 0 matters: any factor > 0 trips combineRGB()'s
+    // round-up-to-1 floor and shows faint dots, including for level 0
+    // (buienradar's explicit "no rain").
+    float factor = (float)(lastLevels[i] - levelOff) / (levelFull - levelOff);
+    if (factor < 0.0) factor = 0.0;
+    if (factor > 1.0) factor = 1.0;
+    lastFactors[i] = factor;
+    if (factor > maxFactor) maxFactor = factor;
+  }
   IFDEBUG {
     IotsaSerial.print("IotsaBuienradarMod: OK, max factor ");
     IotsaSerial.print(maxFactor);
     IotsaSerial.println(maxFactor > 0 ? " (rain expected)" : " (no rain expected)");
   }
-  neoClockMod.setTemporalStatus(COLOR_RAIN, factors, BUIENRADAR_STATUS_TIMEOUT_SECS);
+  neoClockMod.setTemporalStatus(COLOR_RAIN, lastFactors, BUIENRADAR_STATUS_TIMEOUT_SECS);
 }
 
 void IotsaBuienradarMod::loop() {
@@ -99,30 +115,68 @@ void IotsaBuienradarMod::loop() {
 
 // Everything here is a setting of the clock itself: changing needs "config"
 // (lateSetup()). The coordinates also give away where the clock hangs, the
-// home address: reading them needs "config" too.
+// home address: reading them needs "config" too. The two levels are tuning,
+// how the forecast looks: "lighttuning".
 template<class Ctx> bool IotsaBuienradarMod::_args(Ctx& ctx) {
-  bool changed = false;
-  changed |= ctx.arg("enabled", enabled, IotsaContext::Saved);
+  bool changed = ctx.arg("enabled", enabled, IotsaContext::Saved);
+  IotsaContext::RightsScope rights(ctx);
   ctx.showsNeedRight("config");
   changed |= ctx.arg("latitude", latitude, IotsaContext::Saved);
   changed |= ctx.arg("longitude", longitude, IotsaContext::Saved);
   return changed;
 }
 
+template<class Ctx> bool IotsaBuienradarMod::_levelArgs(Ctx& ctx) {
+  IotsaContext::RightsScope rights(ctx);
+  ctx.argsNeedRight("lighttuning");
+  int newOff = levelOff;
+  int newFull = levelFull;
+  bool changed = ctx.arg("levelOff", newOff, IotsaContext::Saved);
+  changed |= ctx.arg("levelFull", newFull, IotsaContext::Saved);
+  if (changed && newFull <= newOff) ctx.error(400, "levelFull must be above levelOff");
+  if (!changed || ctx.failed()) return false;
+  levelOff = newOff;
+  levelFull = newFull;
+  return true;
+}
+
 void IotsaBuienradarMod::getHandler(IotsaApiContext& ctx) {
   ctx.show("enabled", enabled);
-  ctx.showsNeedRight("config");
-  ctx.show("latitude", latitude);
-  ctx.show("longitude", longitude);
+  {
+    IotsaContext::RightsScope rights(ctx);
+    ctx.showsNeedRight("config");
+    ctx.show("latitude", latitude);
+    ctx.show("longitude", longitude);
+  }
+  ctx.show("levelOff", levelOff);
+  ctx.show("levelFull", levelFull);
+  if (lastPollAtMillis) {
+    JsonObject last = ctx.reply()["lastPoll"].to<JsonObject>();
+    last["secondsAgo"] = (millis() - lastPollAtMillis) / 1000;
+    last["status"] = lastPollStatus;
+    JsonArray times = last["times"].to<JsonArray>();
+    JsonArray levels = last["levels"].to<JsonArray>();
+    JsonArray factors = last["factors"].to<JsonArray>();
+    for (int i = 0; i < lastCount; i++) {
+      times.add(lastTimes[i]);
+      levels.add(lastLevels[i]);
+      if (lastCount == 12) factors.add(lastFactors[i]);
+    }
+  }
 }
 
 void IotsaBuienradarMod::putHandler(IotsaApiContext& ctx) {
-  if (_args(ctx)) nextPollTime = 0; // re-poll promptly with the new settings
+  bool changed = _args(ctx);
+  bool levelsChanged = _levelArgs(ctx);
+  if (ctx.failed()) return;
+  if (changed) nextPollTime = 0; // re-poll promptly with the new settings
+  if (levelsChanged) applyLevels(); // no new poll needed: the levels are kept
 }
 
 #ifdef IOTSA_WITH_WEB
 void IotsaBuienradarMod::formHandler_args(IotsaWebContext& ctx) {
   bool changed = _args(ctx);
+  bool levelsChanged = _levelArgs(ctx);
   // Never prefilled: empty leaves it as it is, "clear" goes back to the
   // compiled-in default.
   String newCA = req.sslInfo;
@@ -130,13 +184,29 @@ void IotsaBuienradarMod::formHandler_args(IotsaWebContext& ctx) {
     req.sslInfo = newCA.length() ? newCA : String(BUIENRADAR_DEFAULT_SSLINFO);
     changed = true;
   }
-  if (changed && !ctx.failed()) nextPollTime = 0;
+  if (ctx.failed()) return;
+  if (changed) nextPollTime = 0;
+  if (levelsChanged) applyLevels();
 }
 
 void IotsaBuienradarMod::formHandler_fields(IotsaWebContext& ctx) {
   if (ctx.includesEveryday()) {
     String status = !enabled ? "disabled" : (latitude == 0.0 && longitude == 0.0) ? "not configured" : "polling every 5 minutes";
     ctx.showStatus("Rain forecast", "", status);
+    if (lastPollAtMillis == 0) {
+      ctx.showStatus("Last poll", "lastPoll", "none yet");
+      return;
+    }
+    ctx.showStatus("Last poll", "lastPoll", String((millis() - lastPollAtMillis) / 1000) + " seconds ago, " + lastPollStatus);
+    if (lastCount == 0) return;
+    // What the ring shows and why: from where the minute hand points, one
+    // row per 5 minutes.
+    ctx << "<table><tr><th>Time</th><th>Level</th><th>Factor</th></tr>\n";
+    for (int i = 0; i < lastCount; i++) {
+      ctx << "<tr><td>" + htmlEncode(lastTimes[i]) + "</td><td>" + String(lastLevels[i]) + "</td><td>"
+        + (lastCount == 12 ? String(lastFactors[i], 2) : String("")) + "</td></tr>\n";
+    }
+    ctx << "</table>\n";
     return;
   }
   {
@@ -146,6 +216,13 @@ void IotsaBuienradarMod::formHandler_fields(IotsaWebContext& ctx) {
     ctx.showsNeedRight("config");
     ctx.showField("Latitude", "latitude", latitude, IotsaWebContext::Saved, "right-click your location on Google Maps and copy the two numbers");
     ctx.showField("Longitude", "longitude", longitude, IotsaWebContext::Saved);
+  }
+  {
+    IotsaContext::RightsScope rights(ctx);
+    ctx.argsNeedRight("lighttuning");
+    IotsaWebContext::Form form(ctx, "Save", "Rain levels");
+    ctx.showField("Off at", "levelOff", levelOff, IotsaWebContext::Saved, "this level and below shows nothing; 40 is about 0.007 mm/h");
+    ctx.showField("Full at", "levelFull", levelFull, IotsaWebContext::Saved, "this level and above is full brightness; 140 is about 9 mm/h");
   }
   bool isDefault = req.sslInfo == String(BUIENRADAR_DEFAULT_SSLINFO);
   IotsaWebContext::Form form(ctx, "Save", "Root CA certificate");
@@ -171,6 +248,12 @@ void IotsaBuienradarMod::configLoad() {
   enabled = (bool)en;
   cf.get("latitude", latitude, 0.0f);
   cf.get("longitude", longitude, 0.0f);
+  cf.get("levelOff", levelOff, BUIENRADAR_LEVEL_OFF);
+  cf.get("levelFull", levelFull, BUIENRADAR_LEVEL_FULL);
+  if (levelFull <= levelOff) {
+    levelOff = BUIENRADAR_LEVEL_OFF;
+    levelFull = BUIENRADAR_LEVEL_FULL;
+  }
   String storedSslInfo;
   cf.get("rootCA", storedSslInfo, "");
   storedSslInfo = unescapeNewlines(storedSslInfo);
@@ -188,6 +271,8 @@ void IotsaBuienradarMod::configSave() {
   cf.put("enabled", int(enabled));
   cf.put("latitude", latitude);
   cf.put("longitude", longitude);
+  cf.put("levelOff", levelOff);
+  cf.put("levelFull", levelFull);
   cf.put("rootCA", escapeNewlines(req.sslInfo));
 }
 

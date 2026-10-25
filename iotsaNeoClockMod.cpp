@@ -2,7 +2,13 @@
 #include "iotsaConfigFile.h"
 #include "iotsaRunmode.h"
 
-#define IFDEBUGX if(0)
+// How the hands are computed, every frame: a subsystem of its own, switched on
+// like iotsa's subsystems (iotsaLog.h): -DNEOCLOCK_DEBUG_HANDS.
+#ifdef NEOCLOCK_DEBUG_HANDS
+#define LOG_HANDS(fmt, ...) IOTSA_LOG("neoclock", fmt, ##__VA_ARGS__)
+#else
+#define LOG_HANDS(fmt, ...) do { if (0) IOTSA_LOG("neoclock", fmt, ##__VA_ARGS__); } while (0)
+#endif
 
 extern "C" {
   int _gettimeofday_r(struct _reent* unused, struct timeval *tp, void *tzp);
@@ -77,7 +83,7 @@ void IotsaNeoClockMod::updateClockFace(uint32_t colors[NUM_LEDS], const ClockTim
     } else {
       valSelf = 1.0;
     }
-    IFDEBUGX { IotsaSerial.printf("seconds=%d, before=%f, self=%f, after=%f", time.seconds, valBefore, valSelf, valAfter); IotsaSerial.println(); }
+    LOG_HANDS("seconds=%d, before=%f, self=%f, after=%f", time.seconds, valBefore, valSelf, valAfter);
 
     int ledSelf = (FIRST_SEC_LED+time.seconds - ledRotationOffset*STRIDE_HOUR_LEDS + NUM_LEDS) % NUM_LEDS;
     int ledBefore = (ledSelf + NUM_LEDS-1) % NUM_LEDS;
@@ -102,7 +108,7 @@ void IotsaNeoClockMod::updateClockFace(uint32_t colors[NUM_LEDS], const ClockTim
     int minutes = time.minutes;
     int minMod5 = minutes % 5;
     minutes = minutes / 5;
-    IFDEBUGX { IotsaSerial.printf("minutes=%d*5 + %d\n", minMod5, minutes);}
+    LOG_HANDS("minutes=%d*5 + %d", minMod5, minutes);
     int firstLed = FIRST_MIN_LED + ((minutes-ledRotationOffset+12)%12)*STRIDE_MIN_LEDS;
     if (firstLed >= NUM_LEDS) firstLed -= NUM_LEDS;
 
@@ -116,7 +122,7 @@ void IotsaNeoClockMod::updateClockFace(uint32_t colors[NUM_LEDS], const ClockTim
   // Hours
   {
     int hours = time.hours;
-    IFDEBUGX { IotsaSerial.print("hours="); IotsaSerial.println(hours); }
+    LOG_HANDS("hours=%d", hours);
     int firstLed = FIRST_HOUR_LED + ((hours-ledRotationOffset+12)%12)*STRIDE_HOUR_LEDS;
     int extraLed = 0;
     // Determine which segment to show the hour hand (depending on whether where

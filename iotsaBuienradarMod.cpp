@@ -37,23 +37,13 @@ static String unescapeNewlines(const String &s) {
 void IotsaBuienradarMod::poll() {
   char query[32];
   snprintf(query, sizeof(query), "lat=%.2f&lon=%.2f", latitude, longitude);
-  IFDEBUG {
-    IotsaSerial.print("IotsaBuienradarMod: GET ");
-    IotsaSerial.print(BUIENRADAR_URL);
-    IotsaSerial.print("?");
-    IotsaSerial.println(query);
-    IotsaSerial.print("IotsaBuienradarMod: free heap before request: ");
-    IotsaSerial.println(ESP.getFreeHeap());
-  }
+  IOTSA_LOG_DEBUG("buienradar", "free heap before request: %u", (unsigned)ESP.getFreeHeap());
   String body;
   bool ok = req.send(query, &body);
-  IFDEBUG {
-    IotsaSerial.print("IotsaBuienradarMod: free heap after request: ");
-    IotsaSerial.println(ESP.getFreeHeap());
-  }
+  IOTSA_LOG_DEBUG("buienradar", "free heap after request: %u", (unsigned)ESP.getFreeHeap());
   lastPollAtMillis = millis();
   if (!ok) {
-    IFDEBUG IotsaSerial.println("IotsaBuienradarMod: request failed");
+    IOTSA_LOG_DEBUG("buienradar", "request failed");
     lastPollStatus = "request failed";
     return;
   }
@@ -75,7 +65,7 @@ void IotsaBuienradarMod::poll() {
   }
   lastCount = n;
   if (n < 12) {
-    IFDEBUG IotsaSerial.println("IotsaBuienradarMod: short/unparseable response, ignoring");
+    IOTSA_LOG("buienradar", "short/unparseable response, ignoring");
     lastPollStatus = "short response";
     return;
   }
@@ -96,11 +86,7 @@ void IotsaBuienradarMod::applyLevels() {
     lastFactors[i] = factor;
     if (factor > maxFactor) maxFactor = factor;
   }
-  IFDEBUG {
-    IotsaSerial.print("IotsaBuienradarMod: OK, max factor ");
-    IotsaSerial.print(maxFactor);
-    IotsaSerial.println(maxFactor > 0 ? " (rain expected)" : " (no rain expected)");
-  }
+  IOTSA_LOG_DEBUG("buienradar", "ok, max factor %f (%s)", maxFactor, maxFactor > 0 ? "rain expected" : "no rain expected");
   neoClockMod.setTemporalStatus(COLOR_RAIN, lastFactors, BUIENRADAR_STATUS_TIMEOUT_SECS);
 }
 

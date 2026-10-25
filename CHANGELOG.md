@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rain ring uses igor's brighter teal colour and level-based scaling again (#11)
 - Hour hand now overlays the minute hand instead of blending with it (#11)
 - crowpanel: LovyanGFX now `^1.2.32`, which fixes the 1.2.30 firmware bloat (#10)
+- Log lines through iotsa's log macros; the clock-hand debug output is `-DNEOCLOCK_DEBUG_HANDS` (cwi-dis/iotsa#182)
 
 ### Removed
 
